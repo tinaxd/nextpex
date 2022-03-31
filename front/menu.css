@@ -1,0 +1,20 @@
+.menu {
+    display: flex;
+    flex-direction: row;
+    width: 100%;
+    justify-content: space-around;
+    background-color: lightgray;
+}
+
+.menu-entry {
+    margin-top: 10px;
+    margin-bottom: 10px;
+}
+
+.menu-logo {
+    font-weight: bold;
+}
+
+.menu-link {
+    cursor: pointer;
+}
