@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/labstack/echo/v4"
 )
@@ -99,14 +100,40 @@ func main() {
 		var query struct {
 			PlayerName string `json:"player_name"`
 			Time       int64  `json:"timestamp"`
-			OldRank    int    `json:"old_rank"`
-			NewRank    int    `json:"new_rank"`
+			OldLevel   int    `json:"old_rank"`
+			NewLevel   int    `json:"new_rank"`
 		}
 		err := c.Bind(&query)
 		if err != nil {
 			return c.NoContent(http.StatusBadRequest)
 		}
-		return nil
+		timestamp := time.Unix(query.Time, 0)
+		err = db.PostLevel(query.PlayerName, query.OldLevel, query.NewLevel, timestamp)
+		if err != nil {
+			return c.NoContent(http.StatusInternalServerError)
+		}
+		return c.NoContent(http.StatusOK)
+	})
+	compat.POST("/rank/register", func(c echo.Context) error {
+		var query struct {
+			PlayerName  string `json:"player_name"`
+			Time        int64  `json:"timestamp"`
+			OldRank     int    `json:"old_rank"`
+			NewRank     int    `json:"new_rank"`
+			OldRankName string `json:"old_rank_name"`
+			NewRankName string `json:"new_rank_name"`
+			RankType    string `json:"rank_type"`
+		}
+		err := c.Bind(&query)
+		if err != nil {
+			return c.NoContent(http.StatusBadRequest)
+		}
+		timestamp := time.Unix(query.Time, 0)
+		err = db.PostRank(query.PlayerName, query.OldRank, query.OldRankName, query.NewRank, query.NewRankName, RankType(query.RankType), timestamp)
+		if err != nil {
+			return c.NoContent(http.StatusInternalServerError)
+		}
+		return c.NoContent(http.StatusOK)
 	})
 
 	e.Logger.Fatal(e.Start(":1323"))

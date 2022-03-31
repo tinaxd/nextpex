@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"errors"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -176,4 +177,44 @@ func (db *DB) GetChecks(entries *int) ([]ApexabilityCheckFetchResult, error) {
 		return nil, err
 	}
 	return checks, nil
+}
+
+func (db *DB) GetPlayerIDByInGameName(inGameName string) (int, error) {
+	var id []map[string]interface{}
+	err := db.db.Get(&id, "select p.id from Player as p inner join InGameName as i on p.id=i.player_id WHERE i.in_game_name=?", inGameName)
+	if err != nil {
+		return 0, err
+	}
+	if len(id) != 1 {
+		return 0, errors.New("count is not 1")
+	}
+	idInterface, ok := id[0]["id"]
+	if !ok {
+		return 0, errors.New("???")
+	}
+	idInt, ok := idInterface.(int)
+	if !ok {
+		return 0, errors.New("????")
+	}
+	return idInt, nil
+}
+
+func (db *DB) PostLevel(inGameName string, oldLevel int, newLevel int, time time.Time) error {
+	playerId, err := db.GetPlayerIDByInGameName(inGameName)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.db.Exec("insert into LevelUpdate(old_level,new_level,time,player_id) VALUES(?,?,?,?)", oldLevel, newLevel, time, playerId)
+	return err
+}
+
+func (db *DB) PostRank(inGameName string, oldRank int, oldRankName string, newRank int, newRankName string, rankType RankType, time time.Time) error {
+	playerId, err := db.GetPlayerIDByInGameName(inGameName)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.db.Exec("insert into RankUpdate(player_id,old_rank,old_name,new_rank,new_name,rank_type,time", playerId, oldRank, oldRankName, newRank, newRankName, string(rankType), time)
+	return err
 }
