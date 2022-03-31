@@ -1,10 +1,10 @@
-const data = JSON.parse(document.querySelector('#apexabilityData').textContent);
+let data = [];
 const tbody = document.querySelector('#apexabilityBody');
 const canvas = document.querySelector('#monthChart');
 
 function makeTr(entry) {
   const tr = document.createElement('tr');
-  
+
   const tdName = document.createElement('td');
   tdName.textContent = entry.player;
 
@@ -19,7 +19,7 @@ function makeTr(entry) {
 
   const tdTime = document.createElement('td');
   const parsedTime = new Date(entry.time);
-  tdTime.textContent = parsedTime.getFullYear().toString() + '-' + (parsedTime.getMonth()+1).toString().padStart(2, '0') + '-' + parsedTime.getDate().toString().padStart(2, '0') + ' ' + parsedTime.getHours().toString().padStart(2, '0') + ':' + parsedTime.getMinutes().toString().padStart(2, '0');
+  tdTime.textContent = parsedTime.getFullYear().toString() + '-' + (parsedTime.getMonth() + 1).toString().padStart(2, '0') + '-' + parsedTime.getDate().toString().padStart(2, '0') + ' ' + parsedTime.getHours().toString().padStart(2, '0') + ':' + parsedTime.getMinutes().toString().padStart(2, '0');
 
   tr.appendChild(tdName);
   tr.appendChild(tdType);
@@ -29,10 +29,17 @@ function makeTr(entry) {
 
 function limitEntry(entries, n) {
   const out = [];
-  for (let i=0; i<entries.length&&i<n; i++) {
+  for (let i = 0; i < entries.length && i < n; i++) {
     out.push(entries[i]);
   }
   return out;
+}
+
+async function retrieveData() {
+  const res = await fetch('http://localhost:1323/check/all');
+  const j = await res.json();
+  data = j;
+  console.log(j);
 }
 
 function updateTable(data) {
@@ -82,12 +89,12 @@ function getPlayTimePerMonth(dataUnsorted) {
         const m = playerPlayedTime.get(player);
 
         // add difference
-        const key = d.getFullYear()*12 + d.getMonth();
+        const key = d.getFullYear() * 12 + d.getMonth();
         let currentHour = 0;
         if (m.has(key)) {
           currentHour = m.get(key);
         }
-        m.set(key, currentHour+hourDiff);
+        m.set(key, currentHour + hourDiff);
 
         // adjust chart x range
         if (rangeMin > key) {
@@ -100,15 +107,15 @@ function getPlayTimePerMonth(dataUnsorted) {
         break;
     }
   }
-  
+
   return [playerPlayedTime, rangeMin, rangeMax];
 }
 
 function drawPlayTimeChart(playTime, xMin, xMax) {
   const labels = [];
-  for (let i=xMin; i<=xMax; i++) {
-    const year = Math.floor(i/12);
-    const month = (i%12)+1;
+  for (let i = xMin; i <= xMax; i++) {
+    const year = Math.floor(i / 12);
+    const month = (i % 12) + 1;
     labels.push(year + '-' + month);
   }
 
@@ -118,7 +125,7 @@ function drawPlayTimeChart(playTime, xMin, xMax) {
     const data = [];
     const backgroundColor = [];
     const color = randomColor();
-    for (let i=xMin; i<=xMax; i++) {
+    for (let i = xMin; i <= xMax; i++) {
       const hours = m.get(i);
       if (hours == null) {
         data.push(0);
@@ -151,7 +158,8 @@ function drawPlayTimeChart(playTime, xMin, xMax) {
   });
 }
 
-window.addEventListener('load', () => {
+window.addEventListener('load', async () => {
+  await retrieveData();
   updateTable(data);
   const [playTime, xMin, xMax] = getPlayTimePerMonth(data);
   drawPlayTimeChart(playTime, xMin, xMax);

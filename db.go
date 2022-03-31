@@ -35,6 +35,10 @@ const schemaLevelUpdate = `create table if not exists LevelUpdate(
 );
 `
 
+const indexLevelUpdate = `create index if not exists levelupdate_time on LevelUpdate(
+	time desc
+	);`
+
 const schemaRankUpdate = `create table if not exists RankUpdate(
 	id INTEGER AUTO_INCREMENT PRIMARY KEY,
 	old_rank INTEGER,
@@ -48,6 +52,10 @@ const schemaRankUpdate = `create table if not exists RankUpdate(
 );
 `
 
+const indexRankUpdate = `create index if not exists rankupdate_time on RankUpdate(
+	time desc
+	);`
+
 const schemaApexabilityCheck = `create table if not exists ApexabilityCheck(
 	id INTEGER AUTO_INCREMENT PRIMARY KEY,
 	entry_type VARCHAR(5) NOT NULL,
@@ -57,12 +65,19 @@ const schemaApexabilityCheck = `create table if not exists ApexabilityCheck(
 );
 `
 
+const indexApexabilityCheck = `create index if not exists apexabilitycheck_time on ApexabilityCheck(
+	time desc
+	);`
+
 var schemas = []string{
 	schemaPlayer,
 	schemaInGameName,
 	schemaLevelUpdate,
 	schemaRankUpdate,
 	schemaApexabilityCheck,
+	indexLevelUpdate,
+	indexRankUpdate,
+	indexApexabilityCheck,
 }
 
 type Player struct {
