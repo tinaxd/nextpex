@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/labstack/echo/v4"
 )
@@ -58,6 +59,54 @@ func main() {
 			reply = append(reply, entry)
 		}
 		return c.JSON(http.StatusOK, reply)
+	})
+
+	checkHelper := func(c echo.Context, entries *int) error {
+		checks, err := db.GetChecks(entries)
+		if err != nil {
+			fmt.Println(err)
+			return c.NoContent(http.StatusInternalServerError)
+		}
+		reply := make([]map[string]interface{}, 0)
+		for _, check := range checks {
+			entry := make(map[string]interface{})
+			entry["entry_type"] = check.EntryType
+			entry["time"] = check.Time
+			entry["player"] = check.DisplayName
+			reply = append(reply, entry)
+		}
+		return c.JSON(http.StatusOK, reply)
+	}
+
+	e.GET("/check/all", func(c echo.Context) error {
+		return checkHelper(c, nil)
+	})
+	e.GET("/check/recent/:entries", func(c echo.Context) error {
+		entStr := c.Param("entries")
+		ent, err := strconv.ParseInt(entStr, 10, 32)
+		if err != nil {
+			return c.String(http.StatusBadRequest, "entries must be a number.")
+		}
+		if ent <= 0 {
+			return c.String(http.StatusBadRequest, "entries must be a positive number")
+		}
+		entP := int(ent)
+		return checkHelper(c, &entP)
+	})
+
+	compat := e.Group("/api/compat")
+	compat.POST("/level/register", func(c echo.Context) error {
+		var query struct {
+			PlayerName string `json:"player_name"`
+			Time       int64  `json:"timestamp"`
+			OldRank    int    `json:"old_rank"`
+			NewRank    int    `json:"new_rank"`
+		}
+		err := c.Bind(&query)
+		if err != nil {
+			return c.NoContent(http.StatusBadRequest)
+		}
+		return nil
 	})
 
 	e.Logger.Fatal(e.Start(":1323"))

@@ -115,6 +115,12 @@ type RankUpdateFetchResult struct {
 	DisplayName string    `db:"display_name"`
 }
 
+type ApexabilityCheckFetchResult struct {
+	EntryType   string    `db:"entry_type"`
+	Time        time.Time `db:"time"`
+	DisplayName string    `db:"display_name"`
+}
+
 type DB struct {
 	db *sqlx.DB
 }
@@ -156,4 +162,18 @@ func (db *DB) GetAllRanks(rankType RankType) ([]RankUpdateFetchResult, error) {
 		return nil, err
 	}
 	return updates, nil
+}
+
+func (db *DB) GetChecks(entries *int) ([]ApexabilityCheckFetchResult, error) {
+	checks := []ApexabilityCheckFetchResult{}
+	var err error
+	if entries != nil {
+		err = db.db.Select(&checks, "select c.entry_type,c.time,p.display_name from ApexabilityCheck as c inner join Player as p on c.player_id=p.id order by c.time desc limit ?", entries)
+	} else {
+		err = db.db.Select(&checks, "select c.entry_type,c.time,p.display_name from ApexabilityCheck as c inner join Player as p on c.player_id=p.id order by c.time desc")
+	}
+	if err != nil {
+		return nil, err
+	}
+	return checks, nil
 }
