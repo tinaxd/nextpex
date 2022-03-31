@@ -107,9 +107,24 @@ type LevelUpdateFetchResult struct {
 	DisplayName string    `db:"display_name"`
 }
 
+type RankUpdateFetchResult struct {
+	NewRank     int       `db:"new_rank"`
+	RankType    string    `db:"rank_type"`
+	NewName     string    `db:"new_name"`
+	Time        time.Time `db:"time"`
+	DisplayName string    `db:"display_name"`
+}
+
 type DB struct {
 	db *sqlx.DB
 }
+
+type RankType string
+
+const (
+	RankTypeTrio  RankType = "trio"
+	RankTypeArena RankType = "arena"
+)
 
 func NewDB() (*DB, error) {
 	db, err := sqlx.Connect("mysql", "nextpex:nextpex@/nextpex?parseTime=true")
@@ -128,6 +143,15 @@ func (db *DB) Init() {
 func (db *DB) GetAllLevels() ([]LevelUpdateFetchResult, error) {
 	updates := []LevelUpdateFetchResult{}
 	err := db.db.Select(&updates, "SELECT l.new_level,l.time,p.display_name FROM LevelUpdate as l INNER JOIN Player as p ON l.player_id=p.id ORDER BY time DESC")
+	if err != nil {
+		return nil, err
+	}
+	return updates, nil
+}
+
+func (db *DB) GetAllRanks(rankType RankType) ([]RankUpdateFetchResult, error) {
+	updates := []RankUpdateFetchResult{}
+	err := db.db.Select(&updates, "SELECT r.new_rank,r.new_name,r.time,p.display_name,r.rank_type FROM RankUpdate as r INNER JOIN Player as p ON r.player_id=p.id WHERE r.rank_type=? ORDER BY r.time DESC", rankType)
 	if err != nil {
 		return nil, err
 	}
