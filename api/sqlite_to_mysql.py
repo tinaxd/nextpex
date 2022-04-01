@@ -30,7 +30,7 @@ if False:
     sys.exit(0)
 # mysql part
 cnx = mysql.connector.connect(user='nextpex', password='nextpex',
-                              host='127.0.0.1',
+                              host='127.0.0.1', port=3600,
                               database='nextpex')
 cnx.start_transaction()
 cursor=cnx.cursor()
