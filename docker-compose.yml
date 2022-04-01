@@ -26,3 +26,7 @@ services:
       - bot.env
     depends_on:
       - api
+  web:
+    build: ./front
+    ports:
+      - "3602:80"
