@@ -2,7 +2,6 @@ package main
 
 import (
 	"database/sql"
-	"errors"
 	"fmt"
 	"os"
 	"time"
@@ -245,23 +244,12 @@ func (db *DB) GetChecks(entries *int) ([]ApexabilityCheckFetchResult, error) {
 }
 
 func (db *DB) GetPlayerIDByInGameName(inGameName string) (int, error) {
-	var id []map[string]interface{}
+	var id int
 	err := db.db.Get(&id, "select p.id from Player as p inner join InGameName as i on p.id=i.player_id WHERE i.in_game_name=?", inGameName)
 	if err != nil {
 		return 0, err
 	}
-	if len(id) != 1 {
-		return 0, errors.New("count is not 1")
-	}
-	idInterface, ok := id[0]["id"]
-	if !ok {
-		return 0, errors.New("???")
-	}
-	idInt, ok := idInterface.(int)
-	if !ok {
-		return 0, errors.New("????")
-	}
-	return idInt, nil
+	return id, nil
 }
 
 func (db *DB) PostLevel(inGameName string, oldLevel int, newLevel int, time time.Time) error {
@@ -280,7 +268,7 @@ func (db *DB) PostRank(inGameName string, oldRank int, oldRankName string, newRa
 		return err
 	}
 
-	_, err = db.db.Exec("insert into RankUpdate(player_id,old_rank,old_name,new_rank,new_name,rank_type,time", playerId, oldRank, oldRankName, newRank, newRankName, string(rankType), time)
+	_, err = db.db.Exec("insert into RankUpdate(player_id,old_rank,old_name,new_rank,new_name,rank_type,time) VALUES(?,?,?,?,?,?,?)", playerId, oldRank, oldRankName, newRank, newRankName, string(rankType), time)
 	return err
 }
 

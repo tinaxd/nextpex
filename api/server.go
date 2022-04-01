@@ -107,7 +107,7 @@ func main() {
 		}
 
 		if query.Type != "start" && query.Type != "stop" {
-			return c.String(http.StatusBadRequest, "type must be either start of stop")
+			return c.String(http.StatusBadRequest, "type must be either start or stop")
 		}
 
 		parsedTime, err := time.Parse(time.RFC3339, query.Time)
@@ -117,6 +117,7 @@ func main() {
 
 		err = db.PostCheck(query.InGameName, CheckType(query.Type), parsedTime)
 		if err != nil {
+			fmt.Printf("/check/register error: %v\n", err)
 			return c.NoContent(http.StatusInternalServerError)
 		}
 		return c.NoContent(http.StatusOK)
@@ -137,6 +138,7 @@ func main() {
 		timestamp := time.Unix(query.Time, 0)
 		err = db.PostLevel(query.PlayerName, query.OldLevel, query.NewLevel, timestamp)
 		if err != nil {
+			fmt.Printf("/level/register error: %v\n", err)
 			return c.NoContent(http.StatusInternalServerError)
 		}
 		return c.NoContent(http.StatusOK)
@@ -158,6 +160,7 @@ func main() {
 		timestamp := time.Unix(query.Time, 0)
 		err = db.PostRank(query.PlayerName, query.OldRank, query.OldRankName, query.NewRank, query.NewRankName, RankType(query.RankType), timestamp)
 		if err != nil {
+			fmt.Printf("/rank/register error: %v\n", err)
 			return c.NoContent(http.StatusInternalServerError)
 		}
 		return c.NoContent(http.StatusOK)
