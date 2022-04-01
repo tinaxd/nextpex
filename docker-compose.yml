@@ -28,6 +28,8 @@ services:
       - bot.env
     depends_on:
       - api
+    profiles:
+      - production
   web:
     build: ./front
     ports:
