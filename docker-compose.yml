@@ -29,7 +29,7 @@ services:
     depends_on:
       - api
     profiles:
-      - production
+      - bot
   web:
     build: ./front
     ports:
