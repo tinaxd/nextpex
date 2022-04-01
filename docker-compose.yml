@@ -16,7 +16,7 @@ services:
     environment:
       - MARIADB_USER=nextpex
       - MARIADB_PASSWORD=nextpex
-      - MARIADB_RANDOM_ROOT_PASSWORD=yes
+      - MARIADB_ROOT_PASSWORD=nextpex
       - MARIADB_DATABASE=nextpex
     ports:
       - "3600:3306"
