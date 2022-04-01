@@ -3,6 +3,8 @@ package main
 import (
 	"database/sql"
 	"errors"
+	"fmt"
+	"os"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -148,8 +150,43 @@ const (
 	RankTypeArena RankType = "arena"
 )
 
+var (
+	DB_USER string
+	DB_PASS string
+	DB_ADDR string
+	DB_NAME string
+)
+
+func init() {
+	DB_USER = os.Getenv("DB_USER")
+	DB_PASS = os.Getenv("DB_PASS")
+	DB_ADDR = os.Getenv("DB_ADDR")
+	DB_NAME = os.Getenv("DB_NAME")
+	notSet := false
+	if DB_USER == "" {
+		fmt.Println("DB_USER not set")
+		notSet = true
+	}
+	if DB_PASS == "" {
+		fmt.Println("DB_PASS not set")
+		notSet = true
+	}
+	if DB_ADDR == "" {
+		fmt.Println("DB_ADDR not set")
+		notSet = true
+	}
+	if DB_NAME == "" {
+		fmt.Println("DB_NAME not set")
+		notSet = true
+	}
+	if notSet {
+		os.Exit(2)
+	}
+}
+
 func NewDB() (*DB, error) {
-	db, err := sqlx.Connect("mysql", "nextpex:nextpex@/nextpex?parseTime=true")
+	conn := fmt.Sprintf("%v:%v@tcp(%v)/%v?parseTime=true", DB_USER, DB_PASS, DB_ADDR, DB_NAME)
+	db, err := sqlx.Connect("mysql", conn)
 	if err != nil {
 		return nil, err
 	}
