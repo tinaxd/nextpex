@@ -144,10 +144,13 @@ type DB struct {
 }
 
 type RankType string
+type CheckType string
 
 const (
-	RankTypeTrio  RankType = "trio"
-	RankTypeArena RankType = "arena"
+	RankTypeTrio   RankType  = "trio"
+	RankTypeArena  RankType  = "arena"
+	CheckTypeStart CheckType = "start"
+	CheckTypeStop  CheckType = "stop"
 )
 
 var (
@@ -278,5 +281,14 @@ func (db *DB) PostRank(inGameName string, oldRank int, oldRankName string, newRa
 	}
 
 	_, err = db.db.Exec("insert into RankUpdate(player_id,old_rank,old_name,new_rank,new_name,rank_type,time", playerId, oldRank, oldRankName, newRank, newRankName, string(rankType), time)
+	return err
+}
+
+func (db *DB) PostCheck(inGameName string, checkType CheckType, time time.Time) error {
+	playerId, err := db.GetPlayerIDByInGameName(inGameName)
+	if err != nil {
+		return err
+	}
+	_, err = db.db.Exec("insert into ApexabilityCheck(entry_type,time,player_id) VALUES (?,?,?)", checkType, time, playerId)
 	return err
 }

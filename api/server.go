@@ -96,6 +96,31 @@ func main() {
 		entP := int(ent)
 		return checkHelper(c, &entP)
 	})
+	e.POST("/check/register", func(c echo.Context) error {
+		var query struct {
+			InGameName string `json:"in_game_name"`
+			Type       string `json:"type"`
+			Time       string `json:"time"`
+		}
+		if err := c.Bind(&query); err != nil {
+			return c.NoContent(http.StatusBadRequest)
+		}
+
+		if query.Type != "start" && query.Type != "stop" {
+			return c.String(http.StatusBadRequest, "type must be either start of stop")
+		}
+
+		parsedTime, err := time.Parse(time.RFC3339, query.Time)
+		if err != nil {
+			return c.String(http.StatusBadRequest, "failed to parse time field")
+		}
+
+		err = db.PostCheck(query.InGameName, CheckType(query.Type), parsedTime)
+		if err != nil {
+			return c.NoContent(http.StatusInternalServerError)
+		}
+		return c.NoContent(http.StatusOK)
+	})
 
 	compat := e.Group("/api/compat")
 	compat.POST("/level/register", func(c echo.Context) error {
