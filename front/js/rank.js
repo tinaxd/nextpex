@@ -27,13 +27,32 @@ function updateData() {
             });
         }
     }
+
+    // 現在の日付でプロットを作成(ランクは1つ前と同じ)
+    for (const player in obj) {
+        obj[player].sort((a, b) => a.x - b.x);
+        obj[player].push({
+            x: new Date().getTime(),
+            y: obj[player].slice(-1)[0].y
+        })
+    }
+
     data = [];
     for (const k in obj) {
         const color = randomColor();
         data.push({
             label: k,
             data: obj[k],
-            backgroundColor: color
+            backgroundColor: (context) => {
+                let index = context.dataIndex;
+                let lastIndex = context.dataset.data.length - 1;
+                if (index === lastIndex) {
+                    return color;
+                } else {
+                    // 50%濃くする
+                    return pSBC(0.5, color)
+                }
+            }
         });
     }
     if (chart !== null) {
@@ -155,12 +174,7 @@ function updateChart() {
                         }
                     }
                 },
-            },
-            plugins: [
-                {
-                    beforeDraw: (target) => drawBackground(target, rankType)
-                },
-                {
+                plugins: {
                     tooltip: {
                         callbacks: {
                             label: (context) => {
@@ -169,7 +183,21 @@ function updateChart() {
                                 return `(${dateString}, ${context.parsed.y})`;
                             }
                         }
+                    },
+                    zoom: {
+                        zoom: {
+                            drag: {
+                                enabled: true,
+                                threshold: 5,
+                            },
+                            mode: 'x',
+                        }
                     }
+                }
+            },
+            plugins: [
+                {
+                    beforeDraw: (target) => drawBackground(target, rankType)
                 }
             ]
         });
@@ -185,8 +213,25 @@ document.querySelector('#rankTypeSelector').addEventListener('change', async (ev
     updateChart();
 });
 
+let curX = 0;
+let curY = 0;
+function setCursorPosition(event) {
+    curX = event.screenX;
+    curY = event.screenY;
+}
+
+function resetDragZoom(event) {
+    if (Math.abs(curX - event.screenX) < 15 && Math.abs(curY - event.screenY) < 15) {
+        chart.resetZoom();
+    }
+}
+
 window.addEventListener('load', async () => {
     await retrieveData();
     updateData();
     updateChart();
 });
+
+const canvas = document.getElementById('chart');
+canvas.addEventListener('mousedown', setCursorPosition, false);
+canvas.addEventListener('mouseup', resetDragZoom, false);
