@@ -1,11 +1,12 @@
-'use strict';
+import { makeURL } from "./config.js";
+
 const ctx = document.querySelector('#chart').getContext('2d');
 let chart = null;
 let data = [];
 let levelData = [];
 
 async function retrieveData() {
-    const res = await fetch("http://localhost:1323/level");
+    const res = await fetch(makeURL("/level"));
     const j = await res.json();
     levelData = j;
 }

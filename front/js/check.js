@@ -1,3 +1,5 @@
+import { makeURL } from './config.js';
+
 let data = [];
 const tbody = document.querySelector('#apexabilityBody');
 const canvas = document.querySelector('#monthChart');
@@ -36,7 +38,7 @@ function limitEntry(entries, n) {
 }
 
 async function retrieveData() {
-  const res = await fetch('http://localhost:1323/check/all');
+  const res = await fetch(makeURL('/check/all'));
   const j = await res.json();
   data = j;
   console.log(j);

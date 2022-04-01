@@ -1,4 +1,5 @@
-'use strict';
+import { makeURL } from "./config.js";
+
 const ctx = document.querySelector('#chart').getContext('2d');
 let rankData = [];
 let rankType = 'trio';
@@ -6,7 +7,7 @@ let chart = null;
 let data = [];
 
 async function retrieveData() {
-    const res = await fetch("http://localhost:1323/rank/" + rankType);
+    const res = await fetch(makeURL("/rank/" + rankType));
     const j = await res.json();
     rankData = j;
     console.log(j);
