@@ -78,7 +78,7 @@ async def _send_apex_notification(member: discord.Member, game: str, is_start: b
         content = f'{member.display_name} が {game} {tail}'
         await chan.send(content=content)
         await _apex_role_change(member, is_start)
-        _oneapex_apexability(member.display_name, is_start, datetime.now(tz=dt.timedelta()))
+        _oneapex_apexability(member.display_name, is_start, datetime.now(tz=dt.timezone(dt.timedelta())))
 
 ActType = Union[discord.BaseActivity, discord.Spotify]
 APEXGAME = "Apex Legends"
