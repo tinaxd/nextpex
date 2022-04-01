@@ -7,6 +7,8 @@ services:
       - DB_PASS=nextpex
       - DB_ADDR=db:3306
       - DB_NAME=nextpex
+    ports:
+      - "3601:1323"
     depends_on:
       - db
   db:
@@ -18,3 +20,9 @@ services:
       - MARIADB_DATABASE=nextpex
     ports:
       - "3600:3306"
+  bot:
+    build: ./bot
+    env_file:
+      - bot.env
+    depends_on:
+      - api
