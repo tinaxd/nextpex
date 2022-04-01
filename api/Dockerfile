@@ -8,4 +8,4 @@ RUN go mod download && go mod verify
 COPY *.go ./
 RUN go build -o /usr/local/bin/nextpex
 
-CMD ["nextpex"]
+CMD ["/usr/local/bin/nextpex"]

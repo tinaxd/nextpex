@@ -186,9 +186,19 @@ func init() {
 
 func NewDB() (*DB, error) {
 	conn := fmt.Sprintf("%v:%v@tcp(%v)/%v?parseTime=true", DB_USER, DB_PASS, DB_ADDR, DB_NAME)
-	db, err := sqlx.Connect("mysql", conn)
+	fmt.Printf("connection: %v\n", conn)
+	db, err := sqlx.Open("mysql", conn)
 	if err != nil {
-		return nil, err
+		fmt.Println(err)
+		fmt.Println("Open: could not connect to db, retry in 5 seconds")
+		time.Sleep(5 * time.Second)
+		return NewDB()
+	}
+	if err = db.Ping(); err != nil {
+		fmt.Println(err)
+		fmt.Println("Ping: could not connect to db, retry in 5 seconds")
+		time.Sleep(5 * time.Second)
+		return NewDB()
 	}
 	return &DB{db: db}, nil
 }

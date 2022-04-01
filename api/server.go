@@ -13,7 +13,7 @@ import (
 func main() {
 	// init DB
 	db, err := NewDB()
-	if err != nil {
+	for err != nil {
 		panic(err)
 	}
 	db.Init()
