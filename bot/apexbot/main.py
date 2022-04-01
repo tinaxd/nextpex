@@ -6,6 +6,7 @@ import logging
 from datetime import datetime
 import datetime as dt
 import requests
+import json
 
 logging.basicConfig(level=logging.INFO)
 
@@ -61,13 +62,13 @@ async def _apex_role_change(member: discord.Member, on: bool) -> None:
         await member.remove_roles(role)
 
 def _oneapex_apexability(name: str, is_start: bool, time: datetime) -> None:
-    result = requests.post(WEB_API + "/check/register", {
+    result = requests.post(WEB_API + "/check/register", json={
         "in_game_name": name,
         "type": "start" if is_start else "stop",
         "time": time.isoformat()
     })
     if result.status_code != 200:
-        print(f'api returned non 200 status code!: {result.content}')
+        logging.warning(f'api returned non 200 status code!: {result.content}')
 
 async def _send_apex_notification(member: discord.Member, game: str, is_start: bool) -> None:
     guild = member.guild

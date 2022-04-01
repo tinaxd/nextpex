@@ -103,6 +103,7 @@ func main() {
 			Time       string `json:"time"`
 		}
 		if err := c.Bind(&query); err != nil {
+			fmt.Printf("/check/register bind error: %v\n", err)
 			return c.NoContent(http.StatusBadRequest)
 		}
 
