@@ -20,6 +20,8 @@ services:
       - MARIADB_DATABASE=nextpex
     ports:
       - "3600:3306"
+    volumes:
+      - "dbdata:/var/lib/mysql"
   bot:
     build: ./bot
     env_file:
@@ -30,3 +32,5 @@ services:
     build: ./front
     ports:
       - "3602:80"
+volumes:
+  dbdata:
