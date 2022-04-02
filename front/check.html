@@ -26,19 +26,32 @@
     </div>
 
     <div id="container">
-        Only latest 20 entries are shown.
-        <table class="apexability-table">
-            <thead class="table-header">
-                <tr class="header-row">
-                    <th class="header-cell">Name</th>
-                    <th class="header-cell">Type</th>
-                    <th class="header-cell">Time</th>
-                </tr>
-            </thead>
-            <tbody id="apexabilityBody">
-            </tbody>
-        </table>
-        <canvas id="monthChart"></canvas>
+        <select id="viewTypeSelector">
+            <option value="overview">Overview</option>
+            <option value="daily">Daily</option>
+        </select>
+
+        <div class="swapable" x-view="overview" id="overview">
+            Only latest 20 entries are shown.
+            <table class="apexability-table">
+                <thead class="table-header">
+                    <tr class="header-row">
+                        <th class="header-cell">Name</th>
+                        <th class="header-cell">Type</th>
+                        <th class="header-cell">Time</th>
+                    </tr>
+                </thead>
+                <tbody id="apexabilityBody">
+                </tbody>
+            </table>
+            <canvas id="monthChart"></canvas>
+        </div>
+
+        <div class="swapable" x-view="daily" id="daily">
+            <input type="date" id="dateSelector">
+            <button id="dateTodayButton">Today</button>
+            <div id="dailyCanvasTarget"></div>
+        </div>
     </div>
     <script src="js/check.js" type="module"></script>
 </body>
