@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"time"
 
+	migrate "github.com/golang-migrate/migrate/v4"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 )
@@ -17,7 +18,7 @@ func main() {
 		panic(err)
 	}
 	err = db.Init()
-	if err != nil {
+	if err != nil && err != migrate.ErrNoChange {
 		panic(err)
 	}
 
