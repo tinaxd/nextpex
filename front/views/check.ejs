@@ -4,26 +4,20 @@
 <head>
     <meta charset="UTF-8">
     <title>NextPex - Rank</title>
-    <link rel="stylesheet" href="menu.css">
-    <link rel="stylesheet" href="check.css">
-    <link rel="stylesheet" href="chart.css">
+    <link rel="stylesheet" href="static/css/menu.css">
+    <link rel="stylesheet" href="static/css/check.css">
+    <link rel="stylesheet" href="static/css/chart.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@3.6.2/dist/chart.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/randomcolor/0.6.1/randomColor.min.js"
         integrity="sha512-vPeZ7JCboHcfpqSx5ZD+/jpEhS4JpXxfz9orSvAPPj0EKUVShU2tgy7XkU+oujBJKnWmu4hU7r9MMQNWPfXsYw=="
         crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     <script src="https://cdn.jsdelivr.net/npm/lodash@4.17.21/lodash.min.js"
         integrity="sha256-qXBd/EfAdjOA2FGrGAG+b3YBn2tn5A6bhz+LSgYD96k=" crossorigin="anonymous"></script>
-    <script src="js/menu.js"></script>
+    <script src="static/js/menu.js"></script>
 </head>
 
 <body>
-    <div class="menu">
-        <div class="menu-entry menu-logo">NextPex</div>
-        <div class="menu-entry menu-link" href="level.html">Level</div>
-        <div class="menu-entry menu-link" href="rank.html">Rank</div>
-        <div class="menu-entry menu-link" href="#">Check</div>
-        <div class="menu-entry">Tinaxcraft</div>
-    </div>
+    <%- include('menu') %>
 
     <div id="container">
         <select id="viewTypeSelector">
@@ -53,7 +47,7 @@
             <div id="dailyCanvasTarget"></div>
         </div>
     </div>
-    <script src="js/check.js" type="module"></script>
+    <script src="/static/js/check.js" type="module"></script>
 </body>
 
 </html>
