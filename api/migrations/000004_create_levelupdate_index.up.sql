@@ -1,0 +1,1 @@
+create index if not exists levelupdate_time on LevelUpdate(time desc);

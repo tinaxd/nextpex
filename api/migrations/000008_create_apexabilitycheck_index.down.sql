@@ -1,0 +1,1 @@
+drop index apexabilitycheck_time on ApexabilityCheck;

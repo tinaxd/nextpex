@@ -1,0 +1,1 @@
+drop index rankupdate_time on RankUpdate;

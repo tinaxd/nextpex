@@ -1,0 +1,1 @@
+create index if not exists apexabilitycheck_time on ApexabilityCheck(time desc);

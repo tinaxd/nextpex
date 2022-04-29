@@ -16,7 +16,10 @@ func main() {
 	for err != nil {
 		panic(err)
 	}
-	db.Init()
+	err = db.Init()
+	if err != nil {
+		panic(err)
+	}
 
 	e := echo.New()
 	e.Use(middleware.CORS())
@@ -65,7 +68,7 @@ func main() {
 	})
 
 	checkHelper := func(c echo.Context, entries *int) error {
-		checks, err := db.GetChecks(entries)
+		checks, err := db.GetApexChecks(entries)
 		if err != nil {
 			fmt.Println(err)
 			return c.NoContent(http.StatusInternalServerError)
@@ -116,7 +119,7 @@ func main() {
 			return c.String(http.StatusBadRequest, "failed to parse time field")
 		}
 
-		err = db.PostCheck(query.InGameName, CheckType(query.Type), parsedTime)
+		err = db.PostCheck(query.InGameName, CheckType(query.Type), parsedTime, APEXLEGENDS)
 		if err != nil {
 			fmt.Printf("/check/register error: %v\n", err)
 			return c.NoContent(http.StatusInternalServerError)

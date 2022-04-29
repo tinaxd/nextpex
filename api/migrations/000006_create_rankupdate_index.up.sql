@@ -1,0 +1,1 @@
+create index if not exists rankupdate_time on RankUpdate(time desc);

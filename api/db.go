@@ -9,77 +9,15 @@ import (
 	"github.com/jmoiron/sqlx"
 
 	_ "github.com/go-sql-driver/mysql"
+
+	"github.com/golang-migrate/migrate/v4"
+	"github.com/golang-migrate/migrate/v4/database/mysql"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
 )
 
-const schemaPlayer = `
-create table if not exists Player(
-	id INTEGER AUTO_INCREMENT PRIMARY KEY,
-	display_name VARCHAR(64) UNIQUE NOT NULL
-);
-`
-
-const schemaInGameName = `create table if not exists InGameName(
-	id INTEGER AUTO_INCREMENT PRIMARY KEY,
-	in_game_name VARCHAR(64) NOT NULL UNIQUE,
-	player_id INTEGER NOT NULL,
-	foreign key in_game_name_player(player_id) references Player(id)
-);
-`
-
-const schemaLevelUpdate = `create table if not exists LevelUpdate(
-	id INTEGER AUTO_INCREMENT PRIMARY KEY,
-	old_level INTEGER,
-	new_level INTEGER NOT NULL,
-	time TIMESTAMP NOT NULL,
-	player_id INTEGER NOT NULL,
-	foreign key level_update_player(player_id) references Player(id)
-);
-`
-
-const indexLevelUpdate = `create index if not exists levelupdate_time on LevelUpdate(
-	time desc
-	);`
-
-const schemaRankUpdate = `create table if not exists RankUpdate(
-	id INTEGER AUTO_INCREMENT PRIMARY KEY,
-	old_rank INTEGER,
-	new_rank INTEGER NOT NULL,
-	rank_type VARCHAR(10) NOT NULL,
-	time TIMESTAMP NOT NULL,
-	player_id INTEGER NOT NULL,
-	old_name VARCHAR(20),
-	new_name VARCHAR(20) NOT NULL,
-	foreign key rank_update_player(player_id) references Player(id)
-);
-`
-
-const indexRankUpdate = `create index if not exists rankupdate_time on RankUpdate(
-	time desc
-	);`
-
-const schemaApexabilityCheck = `create table if not exists ApexabilityCheck(
-	id INTEGER AUTO_INCREMENT PRIMARY KEY,
-	entry_type VARCHAR(5) NOT NULL,
-	time TIMESTAMP NOT NULL,
-	player_id INTEGER NOT NULL,
-	foreign key apexability_check_player(player_id) references Player(id)
-);
-`
-
-const indexApexabilityCheck = `create index if not exists apexabilitycheck_time on ApexabilityCheck(
-	time desc
-	);`
-
-var schemas = []string{
-	schemaPlayer,
-	schemaInGameName,
-	schemaLevelUpdate,
-	schemaRankUpdate,
-	schemaApexabilityCheck,
-	indexLevelUpdate,
-	indexRankUpdate,
-	indexApexabilityCheck,
-}
+const (
+	APEXLEGENDS = "Apex Legends"
+)
 
 type Player struct {
 	ID          int    `db:"id"`
@@ -116,6 +54,7 @@ type ApexabilityCheck struct {
 	EntryType string    `db:"entry_type"`
 	Time      time.Time `db:"time"`
 	PlayerID  int       `db:"player_id"`
+	Game      string    `db:"game"`
 }
 
 type LevelUpdateFetchResult struct {
@@ -205,10 +144,18 @@ func NewDB() (*DB, error) {
 	return &DB{db: db}, nil
 }
 
-func (db *DB) Init() {
-	for _, schema := range schemas {
-		db.db.MustExec(schema)
+func (db *DB) Init() error {
+	driver, err := mysql.WithInstance(db.db.DB, &mysql.Config{})
+	if err != nil {
+		return err
 	}
+
+	m, err := migrate.NewWithDatabaseInstance("file://migrations", "mysql", driver)
+	if err != nil {
+		return err
+	}
+
+	return m.Up()
 }
 
 func (db *DB) GetAllLevels() ([]LevelUpdateFetchResult, error) {
@@ -229,13 +176,13 @@ func (db *DB) GetAllRanks(rankType RankType) ([]RankUpdateFetchResult, error) {
 	return updates, nil
 }
 
-func (db *DB) GetChecks(entries *int) ([]ApexabilityCheckFetchResult, error) {
+func (db *DB) GetApexChecks(entries *int) ([]ApexabilityCheckFetchResult, error) {
 	checks := []ApexabilityCheckFetchResult{}
 	var err error
 	if entries != nil {
-		err = db.db.Select(&checks, "select c.entry_type,c.time,p.display_name from ApexabilityCheck as c inner join Player as p on c.player_id=p.id order by c.time desc limit ?", entries)
+		err = db.db.Select(&checks, "select c.entry_type,c.time,p.display_name from ApexabilityCheck as c inner join Player as p on c.player_id=p.id where c.game = 'Apex Legends' order by c.time desc limit ?", entries)
 	} else {
-		err = db.db.Select(&checks, "select c.entry_type,c.time,p.display_name from ApexabilityCheck as c inner join Player as p on c.player_id=p.id order by c.time desc")
+		err = db.db.Select(&checks, "select c.entry_type,c.time,p.display_name from ApexabilityCheck as c inner join Player as p on c.player_id=p.id where c.game = 'Apex Legends' order by c.time desc")
 	}
 	if err != nil {
 		return nil, err
@@ -272,7 +219,7 @@ func (db *DB) PostRank(inGameName string, oldRank int, oldRankName string, newRa
 	return err
 }
 
-func (db *DB) PostCheck(inGameName string, checkType CheckType, time time.Time) error {
+func (db *DB) PostCheck(inGameName string, checkType CheckType, time time.Time, game string) error {
 	playerId, err := db.GetPlayerIDByInGameName(inGameName)
 	if err != nil {
 		return err
