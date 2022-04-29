@@ -1,8 +1,8 @@
 import { makeURL } from "./config.js";
 
-const ctx = document.querySelector('#chart').getContext('2d');
+const ctx = document.querySelector("#chart").getContext("2d");
 let rankData = [];
-let rankType = 'trio';
+let rankType = "trio";
 let chart = null;
 let data = [];
 
@@ -14,7 +14,7 @@ async function retrieveData() {
 }
 
 function updateData() {
-    const obj = {}
+    const obj = {};
     for (const row of rankData) {
         if (row.rank_type === rankType) {
             if (!(row.player in obj)) {
@@ -23,7 +23,7 @@ function updateData() {
             const time = Date.parse(row.time);
             obj[row.player].push({
                 x: time,
-                y: row.rank
+                y: row.rank,
             });
         }
     }
@@ -33,8 +33,8 @@ function updateData() {
         obj[player].sort((a, b) => a.x - b.x);
         obj[player].push({
             x: new Date().getTime(),
-            y: obj[player].slice(-1)[0].y
-        })
+            y: obj[player].slice(-1)[0].y,
+        });
     }
 
     data = [];
@@ -50,9 +50,9 @@ function updateData() {
                     return color;
                 } else {
                     // 50%濃くする
-                    return pSBC(0.5, color)
+                    return pSBC(0.5, color);
                 }
-            }
+            },
         });
     }
     if (chart !== null) {
@@ -100,12 +100,12 @@ function makeArenaColor(rank) {
 
 function drawBackground(target, type) {
     // console.log(target);
-    const yScale = target.scales['y'];
-    const xScale = target.scales['xAxis'];
+    const yScale = target.scales["y"];
+    const xScale = target.scales["xAxis"];
 
     let areas = [];
     switch (type) {
-        case 'trio':
+        case "trio":
             areas = [
                 [0, 1200, makeTrioColor(800)],
                 [1200, 2800, makeTrioColor(1400)],
@@ -113,7 +113,7 @@ function drawBackground(target, type) {
                 [4800, 8000, makeTrioColor(5000)],
             ];
             break;
-        case 'arena':
+        case "arena":
             areas = [
                 [0, 1600, makeArenaColor(800)],
                 [1600, 3200, makeArenaColor(1800)],
@@ -156,9 +156,9 @@ function drawBackground(target, type) {
 function updateChart() {
     if (chart === null) {
         chart = new Chart(ctx, {
-            type: 'scatter',
+            type: "scatter",
             data: {
-                datasets: data
+                datasets: data,
             },
             options: {
                 responsive: true,
@@ -169,20 +169,40 @@ function updateChart() {
                             callback: function (value, index, values) {
                                 //return moment(value).format("YY/MM/DD HH[時]");
                                 const date = new Date(value);
-                                return `${date.getUTCFullYear()}/${(date.getUTCMonth() + 1).toString().padStart(2, '0')}/${date.getDate().toString().padStart(2, '0')}`
-                            }
-                        }
-                    }
+                                return `${date.getUTCFullYear()}/${(
+                                    date.getUTCMonth() + 1
+                                )
+                                    .toString()
+                                    .padStart(2, "0")}/${date
+                                    .getDate()
+                                    .toString()
+                                    .padStart(2, "0")}`;
+                            },
+                        },
+                    },
                 },
                 plugins: {
                     tooltip: {
                         callbacks: {
                             label: (context) => {
                                 const date = new Date(context.parsed.x);
-                                const dateString = `${date.getUTCFullYear()}/${(date.getUTCMonth() + 1).toString().padStart(2, '0')}/${date.getDate().toString().padStart(2, '0')} ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+                                const dateString = `${date.getUTCFullYear()}/${(
+                                    date.getUTCMonth() + 1
+                                )
+                                    .toString()
+                                    .padStart(2, "0")}/${date
+                                    .getDate()
+                                    .toString()
+                                    .padStart(2, "0")} ${date
+                                    .getHours()
+                                    .toString()
+                                    .padStart(2, "0")}:${date
+                                    .getMinutes()
+                                    .toString()
+                                    .padStart(2, "0")}`;
                                 return `(${dateString}, ${context.parsed.y})`;
-                            }
-                        }
+                            },
+                        },
                     },
                     zoom: {
                         zoom: {
@@ -190,28 +210,30 @@ function updateChart() {
                                 enabled: true,
                                 threshold: 5,
                             },
-                            mode: 'x',
-                        }
-                    }
-                }
+                            mode: "x",
+                        },
+                    },
+                },
             },
             plugins: [
                 {
-                    beforeDraw: (target) => drawBackground(target, rankType)
-                }
-            ]
+                    beforeDraw: (target) => drawBackground(target, rankType),
+                },
+            ],
         });
     } else {
         chart.update();
     }
 }
 
-document.querySelector('#rankTypeSelector').addEventListener('change', async (ev) => {
-    rankType = ev.target.value;
-    await retrieveData(); // TODO: cache
-    updateData();
-    updateChart();
-});
+document
+    .querySelector("#rankTypeSelector")
+    .addEventListener("change", async (ev) => {
+        rankType = ev.target.value;
+        await retrieveData(); // TODO: cache
+        updateData();
+        updateChart();
+    });
 
 let curX = 0;
 let curY = 0;
@@ -221,17 +243,20 @@ function setCursorPosition(event) {
 }
 
 function resetDragZoom(event) {
-    if (Math.abs(curX - event.screenX) < 15 && Math.abs(curY - event.screenY) < 15) {
+    if (
+        Math.abs(curX - event.screenX) < 15 &&
+        Math.abs(curY - event.screenY) < 15
+    ) {
         chart.resetZoom();
     }
 }
 
-window.addEventListener('load', async () => {
+window.addEventListener("load", async () => {
     await retrieveData();
     updateData();
     updateChart();
 });
 
-const canvas = document.getElementById('chart');
-canvas.addEventListener('mousedown', setCursorPosition, false);
-canvas.addEventListener('mouseup', resetDragZoom, false);
+const canvas = document.getElementById("chart");
+canvas.addEventListener("mousedown", setCursorPosition, false);
+canvas.addEventListener("mouseup", resetDragZoom, false);
