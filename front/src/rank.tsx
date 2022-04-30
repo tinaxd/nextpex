@@ -260,3 +260,5 @@ window.addEventListener("load", async () => {
 const canvas = document.getElementById("chart");
 canvas.addEventListener("mousedown", setCursorPosition, false);
 canvas.addEventListener("mouseup", resetDragZoom, false);
+
+export function Rank(props: {}) {}

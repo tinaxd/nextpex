@@ -151,7 +151,6 @@ export function Level(props: {}) {
     });
 
     const setCursorPosition = useCallback((x: number, y: number) => {
-        console.log(x, y);
         setCursorPos({
             x: x,
             y: y,
