@@ -1,20 +1,32 @@
+import randomColor from "randomcolor";
+import React, { useEffect, useRef, useState } from "react";
+import { Scatter } from "react-chartjs-2";
 import { makeURL } from "./config.js";
+import { pSBC } from "./RGBmodifier";
 
-const ctx = document.querySelector("#chart").getContext("2d");
-let rankData = [];
-let rankType = "trio";
-let chart = null;
-let data = [];
+type RankType = "trio" | "arena";
+
+type RankData = {
+    player: string;
+    rank: number;
+    rank_type: string;
+    rank_name: string;
+};
 
 async function retrieveData() {
     const res = await fetch(makeURL("/rank/" + rankType));
     const j = await res.json();
-    rankData = j;
-    console.log(j);
+    return j as RankData[];
 }
 
-function updateData() {
-    const obj = {};
+function updateData(j: RankData[]) {
+    const obj: Record<
+        string,
+        {
+            x: number;
+            y: number;
+        }[]
+    > = {};
     for (const row of rankData) {
         if (row.rank_type === rankType) {
             if (!(row.player in obj)) {
@@ -37,7 +49,14 @@ function updateData() {
         });
     }
 
-    data = [];
+    const data: {
+        label: string;
+        data: {
+            x: number;
+            y: number;
+        }[];
+        backgroundColor: (context: any) => string;
+    }[] = [];
     for (const k in obj) {
         const color = randomColor();
         data.push({
@@ -55,16 +74,14 @@ function updateData() {
             },
         });
     }
-    if (chart !== null) {
-        chart.data.datasets = data;
-    }
+    return data;
 }
 
-function makeRGBA(r, g, b, a) {
+function makeRGBA(r: number, g: number, b: number, a: number): string {
     return `rgba(${r},${g},${b},${a})`;
 }
 
-function makeTrioColor(rank) {
+function makeTrioColor(rank: number): string {
     const alpha = 0.3;
     if (rank < 1200) {
         // bronze
@@ -81,7 +98,7 @@ function makeTrioColor(rank) {
     }
 }
 
-function makeArenaColor(rank) {
+function makeArenaColor(rank: number): string {
     const alpha = 0.3;
     if (rank < 1600) {
         // bronze
@@ -98,7 +115,7 @@ function makeArenaColor(rank) {
     }
 }
 
-function drawBackground(target, type) {
+function drawBackground(target: any, ctx: any, type: RankType) {
     // console.log(target);
     const yScale = target.scales["y"];
     const xScale = target.scales["xAxis"];
@@ -153,112 +170,97 @@ function drawBackground(target, type) {
     }
 }
 
-function updateChart() {
-    if (chart === null) {
-        chart = new Chart(ctx, {
-            type: "scatter",
-            data: {
-                datasets: data,
-            },
-            options: {
-                responsive: true,
-                showLine: true,
-                scales: {
-                    xAxis: {
-                        ticks: {
-                            callback: function (value, index, values) {
-                                //return moment(value).format("YY/MM/DD HH[時]");
-                                const date = new Date(value);
-                                return `${date.getUTCFullYear()}/${(
-                                    date.getUTCMonth() + 1
-                                )
-                                    .toString()
-                                    .padStart(2, "0")}/${date
-                                    .getDate()
-                                    .toString()
-                                    .padStart(2, "0")}`;
-                            },
-                        },
-                    },
-                },
-                plugins: {
-                    tooltip: {
-                        callbacks: {
-                            label: (context) => {
-                                const date = new Date(context.parsed.x);
-                                const dateString = `${date.getUTCFullYear()}/${(
-                                    date.getUTCMonth() + 1
-                                )
-                                    .toString()
-                                    .padStart(2, "0")}/${date
-                                    .getDate()
-                                    .toString()
-                                    .padStart(2, "0")} ${date
-                                    .getHours()
-                                    .toString()
-                                    .padStart(2, "0")}:${date
-                                    .getMinutes()
-                                    .toString()
-                                    .padStart(2, "0")}`;
-                                return `(${dateString}, ${context.parsed.y})`;
-                            },
-                        },
-                    },
-                    zoom: {
-                        zoom: {
-                            drag: {
-                                enabled: true,
-                                threshold: 5,
-                            },
-                            mode: "x",
-                        },
+export function Rank(props: {}) {
+    const [rankType, setRankType] = useState<RankType>("trio");
+    const [data, setData] = useState<RankData[]>([]);
+
+    useEffect(() => {
+        retrieveData().then((d) => setData(d));
+    }, []);
+
+    const chartData = updateData(data);
+
+    const options = {
+        responsive: true,
+        showLine: true,
+        scales: {
+            xAxis: {
+                ticks: {
+                    callback: function (value, index, values) {
+                        //return moment(value).format("YY/MM/DD HH[時]");
+                        const date = new Date(value);
+                        return `${date.getUTCFullYear()}/${(
+                            date.getUTCMonth() + 1
+                        )
+                            .toString()
+                            .padStart(2, "0")}/${date
+                            .getDate()
+                            .toString()
+                            .padStart(2, "0")}`;
                     },
                 },
             },
-            plugins: [
-                {
-                    beforeDraw: (target) => drawBackground(target, rankType),
+        },
+        plugins: {
+            tooltip: {
+                callbacks: {
+                    label: (context: any) => {
+                        const date = new Date(context.parsed.x);
+                        const dateString = `${date.getUTCFullYear()}/${(
+                            date.getUTCMonth() + 1
+                        )
+                            .toString()
+                            .padStart(2, "0")}/${date
+                            .getDate()
+                            .toString()
+                            .padStart(2, "0")} ${date
+                            .getHours()
+                            .toString()
+                            .padStart(2, "0")}:${date
+                            .getMinutes()
+                            .toString()
+                            .padStart(2, "0")}`;
+                        return `(${dateString}, ${context.parsed.y})`;
+                    },
                 },
-            ],
-        });
-    } else {
-        chart.update();
-    }
+            },
+            zoom: {
+                zoom: {
+                    drag: {
+                        enabled: true,
+                        threshold: 5,
+                    },
+                    mode: "x",
+                },
+            },
+        },
+    };
+
+    const chartRef = useRef(null);
+
+    const plugins = [
+        {
+            beforeDraw: (target) => drawBackground(target, null, rankType),
+        },
+    ];
+
+    console.log(chartRef.current);
+
+    return (
+        <div>
+            <select
+                value={rankType}
+                onChange={(ev) => setRankType(ev.target.value as RankType)}
+            >
+                <option value="trio">Trio</option>
+                <option value="arena">Arena</option>
+            </select>
+            <Scatter
+                data={{ datasets: chartData }}
+                options={options}
+                plugins={plugins as any}
+                ref={chartRef}
+            />
+        </div>
+    );
 }
-
-document
-    .querySelector("#rankTypeSelector")
-    .addEventListener("change", async (ev) => {
-        rankType = ev.target.value;
-        await retrieveData(); // TODO: cache
-        updateData();
-        updateChart();
-    });
-
-let curX = 0;
-let curY = 0;
-function setCursorPosition(event) {
-    curX = event.screenX;
-    curY = event.screenY;
-}
-
-function resetDragZoom(event) {
-    if (
-        Math.abs(curX - event.screenX) < 15 &&
-        Math.abs(curY - event.screenY) < 15
-    ) {
-        chart.resetZoom();
-    }
-}
-
-window.addEventListener("load", async () => {
-    await retrieveData();
-    updateData();
-    updateChart();
-});
-
-const canvas = document.getElementById("chart");
-canvas.addEventListener("mousedown", setCursorPosition, false);
-canvas.addEventListener("mouseup", resetDragZoom, false);
-
-export function Rank(props: {}) {}
