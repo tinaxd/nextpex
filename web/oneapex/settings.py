@@ -145,6 +145,7 @@ STATIC_ROOT = 'static/'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 CSRF_TRUSTED_ORIGINS = ['https://oneapex.tinax.work',
+                        'https://nextpex.tinax.work',
                         'http://127.0.0.1:8001', 'http://localhost:8000']
 
 CORS_ALLOW_ALL_ORIGINS = True
