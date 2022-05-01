@@ -79,6 +79,10 @@ class RankUpdate(models.Model):
         ]
 
 
+class Game(models.Model):
+    name = models.CharField(max_length=80, blank=False, null=False)
+
+
 class ApexabilityCheck(models.Model):
     class StartStopType(models.TextChoices):
         START = 'start', 'Start'
@@ -88,20 +92,26 @@ class ApexabilityCheck(models.Model):
     entry_type = models.CharField(
         choices=StartStopType.choices, blank=False, null=False, max_length=5)
     time = models.DateTimeField(blank=False, null=False)
+    game = models.ForeignKey(
+        Game, on_delete=models.CASCADE, blank=False, null=True)
 
     def as_dict(self):
+        game = self.game.name if self.game else 'Apex Legends'
         return {
             'player': self.player.display_name,
             'entry_type': self.entry_type,
-            'time': self.time
+            'time': self.time,
+            'game': game
         }
 
     def __str__(self):
-        return f'{self.player} {self.entry_type}s at {self.time}'
+        return f'{self.player} {self.entry_type}s at {self.time} ({self.game})'
 
     class Meta:
         indexes = [
-            models.Index(fields=['-time'], name='check_time_desc')
+            models.Index(fields=['-time'], name='check_time_desc'),
+            models.Index(fields=['game', '-time'],
+                         name='check_game_time_desc'),
         ]
 
 

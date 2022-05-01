@@ -13,6 +13,8 @@ https://docs.djangoproject.com/en/3.2/ref/settings/
 from pathlib import Path
 import os
 
+PRODUCTION = os.getenv("PRODUCTION") is not None
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -24,7 +26,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-)@se*gs^-0^z00-_!rrevf96+s_8ukmhl58ljuj_0$ksl6-a_p'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+DEBUG = not PRODUCTION
 
 ALLOWED_HOSTS = ['*']
 
@@ -80,7 +82,6 @@ WSGI_APPLICATION = 'oneapex.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/3.2/ref/settings/#databases
 
-PRODUCTION = os.getenv("PRODUCTION") is not None
 if PRODUCTION:
     DATABASES = {
         'default': {
