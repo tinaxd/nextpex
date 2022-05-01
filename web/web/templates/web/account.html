@@ -1,0 +1,53 @@
+{% extends 'web/base.html' %}
+{% load static %}
+{% block header %}
+<link rel="stylesheet" href="{% static 'web/account.css' %}">
+{% endblock header %}
+
+{% block body %}
+{% include 'web/header.html' %}
+<div id="container">
+    {% include 'web/account_header.html' %}
+
+    <!-- {% if errormsg %}
+    <div>
+        <p>{{errormsg}}</p>
+    </div>
+    {% endif %} -->
+
+    <div class="info-entry">
+        {% if player_name %}
+        <p class="info-label">リンクされているプレイヤー</p>
+        <p>{{player_name}}</p>
+        {% else %}
+        <p>リンクされているプレイヤーはありません</p>
+        {% endif %}
+    </div>
+
+    {% if discord_names %}
+    <div class="info-entry">
+        <p class="info-label">登録されているDiscordユーザー名</p>
+        次のいずれかの名前をDiscordユーザー名として利用してください。
+        <ul>
+            {% for name in discord_names %}
+            <li>{{name}}</li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+
+    <div class="info-entry">
+        <p class="info-label">プレイヤーとの紐づけ</p>
+        <a href="{% url 'web:link-account' %}" class="go go-primary">Go</a>
+    </div>
+
+    {% if staff %}
+    <div class="info-entry">
+        <p class="info-label">紐づけの承認</p>
+        <a href="{% url 'web:link-approve' %}" class="go go-primary">Go</a>
+    </div>
+    {% endif %}
+
+    <a href="{% url 'web:logout-account' %}" class="go go-danger">ログアウト</a>
+</div>
+{% endblock body %}

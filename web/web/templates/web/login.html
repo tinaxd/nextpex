@@ -1,0 +1,20 @@
+{% extends 'web/base.html' %}
+{% load static %}
+{% block header %}
+{% endblock header %}
+
+{% block body %}
+{% include 'web/header.html' %}
+<div id="container">
+    {% if error_message %}
+    <p class="error-message">{{error_message}}</p>
+    {% endif %}
+    <form action="{% url 'web:login-account' %}" method="POST">
+        {% csrf_token %}
+        {{form.as_p}}
+        <p><input type="submit" value="Login"></p>
+    </form>
+
+    <a href="{% url 'web:register-account' %}">アカウント新規作成</a>
+</div>
+{% endblock body %}
