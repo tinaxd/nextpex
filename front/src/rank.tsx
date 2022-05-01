@@ -1,7 +1,7 @@
 import randomColor from "randomcolor";
 import React, { useEffect, useRef, useState } from "react";
 import { Scatter } from "react-chartjs-2";
-import { makeURL } from "./config.js";
+import { makeURL } from "./config";
 import { pSBC } from "./RGBmodifier";
 
 type RankType = "trio" | "arena";
@@ -11,15 +11,16 @@ type RankData = {
     rank: number;
     rank_type: string;
     rank_name: string;
+    time: string;
 };
 
-async function retrieveData() {
+async function retrieveData(rankType: string) {
     const res = await fetch(makeURL("/rank/" + rankType));
     const j = await res.json();
     return j as RankData[];
 }
 
-function updateData(j: RankData[]) {
+function updateData(rankData: RankData[], rankType: string) {
     const obj: Record<
         string,
         {
@@ -175,10 +176,10 @@ export function Rank(props: {}) {
     const [data, setData] = useState<RankData[]>([]);
 
     useEffect(() => {
-        retrieveData().then((d) => setData(d));
-    }, []);
+        retrieveData(rankType).then((d) => setData(d));
+    }, [rankType]);
 
-    const chartData = updateData(data);
+    const chartData = updateData(data, rankType);
 
     const options = {
         responsive: true,
@@ -186,7 +187,7 @@ export function Rank(props: {}) {
         scales: {
             xAxis: {
                 ticks: {
-                    callback: function (value, index, values) {
+                    callback: function (value: any, index: any, values: any) {
                         //return moment(value).format("YY/MM/DD HH[時]");
                         const date = new Date(value);
                         return `${date.getUTCFullYear()}/${(
@@ -240,7 +241,11 @@ export function Rank(props: {}) {
 
     const plugins = [
         {
-            beforeDraw: (target) => drawBackground(target, null, rankType),
+            beforeDraw: (target: any) => {
+                if (chartRef.current) {
+                    drawBackground(target, chartRef.current.ctx, rankType);
+                }
+            },
         },
     ];
 
@@ -257,7 +262,7 @@ export function Rank(props: {}) {
             </select>
             <Scatter
                 data={{ datasets: chartData }}
-                options={options}
+                options={options as any}
                 plugins={plugins as any}
                 ref={chartRef}
             />

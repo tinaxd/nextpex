@@ -3,6 +3,7 @@ import { BrowserRouter, Link, Route } from "react-router-dom";
 import { Routes } from "../node_modules/react-router-dom/index";
 import "./css/menu.css";
 import { Level } from "./level";
+import { Rank } from "./rank";
 
 function Menu(props: {}) {
     return (
@@ -28,6 +29,7 @@ export default function App(props: {}) {
             <Menu />
             <Routes>
                 <Route path="/level" element={<Level />}></Route>
+                <Route path="/rank" element={<Rank />}></Route>
             </Routes>
         </>
     );
