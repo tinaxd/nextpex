@@ -62,7 +62,7 @@ async def _apex_role_change(member: discord.Member, on: bool) -> None:
         await member.remove_roles(role)
 
 def _oneapex_apexability(name: str, is_start: bool, time: datetime) -> None:
-    result = requests.post(WEB_API + "/check/register", json={
+    result = requests.post(WEB_API + "/register/check", json={
         "in_game_name": name,
         "type": "start" if is_start else "stop",
         "time": time.isoformat()
