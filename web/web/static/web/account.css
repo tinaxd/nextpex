@@ -1,0 +1,33 @@
+.info-entry {
+    margin: 5px;
+    padding: 5px;
+    background-color: lightgray;
+}
+
+.info-label {
+    font-weight: bold;
+}
+
+.go {
+    text-decoration: none;
+    padding: 6px;
+    margin: 3px;
+    display: inline-block;
+    border-radius: 10px;
+    border: 0;
+}
+
+.go-primary {
+    background-color: lightblue;
+    color: black;
+}
+
+.go-danger {
+    background-color: orange;
+    color: black;
+}
+
+#container {
+    margin-left: auto;
+    margin-right: auto;
+}

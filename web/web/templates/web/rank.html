@@ -1,0 +1,24 @@
+{% extends 'web/base.html' %}
+{% load static %}
+{% block header %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.6.2/dist/chart.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-zoom/1.2.0/chartjs-plugin-zoom.min.js" integrity="sha512-TT0wAMqqtjXVzpc48sI0G84rBP+oTkBZPgeRYIOVRGUdwJsyS3WPipsNh///ay2LJ+onCM23tipnz6EvEy2/UA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<link rel="stylesheet" type="text/css" href="{% static 'web/chart.css' %}">
+<link rel="stylesheet" type="text/css" href="{% static 'web/rank.css' %}">
+<script src="{% static 'web/config.js' %}" type="module"></script>
+{% endblock header %}
+
+{% block body %}
+{% include 'web/header.html' %}
+<div id="mainContent">
+    <select id="rankTypeSelector">
+        <option value="trio">Trio</option>
+        <option value="arena">Arena</option>
+    </select>
+    <canvas id="chart"></canvas>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/randomcolor/0.6.1/randomColor.min.js" integrity="sha512-vPeZ7JCboHcfpqSx5ZD+/jpEhS4JpXxfz9orSvAPPj0EKUVShU2tgy7XkU+oujBJKnWmu4hU7r9MMQNWPfXsYw==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="{% static 'web/RGBmodifier.js' %}"></script>
+<script src="{% static 'web/rank.js' %}" type="module"></script>
+{% endblock body %}

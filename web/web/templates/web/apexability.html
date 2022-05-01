@@ -1,0 +1,42 @@
+{% extends 'web/base.html' %}
+{% load static %}
+{% block header %}
+<link rel="stylesheet" type="text/css" href="{% static 'web/apexability.css' %}">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.6.2/dist/chart.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/lodash@4.17.21/lodash.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/randomcolor/0.6.1/randomColor.min.js" integrity="sha512-vPeZ7JCboHcfpqSx5ZD+/jpEhS4JpXxfz9orSvAPPj0EKUVShU2tgy7XkU+oujBJKnWmu4hU7r9MMQNWPfXsYw==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="{% static 'web/config.js' %}" type="module"></script>
+{% endblock header %}
+
+{% block body %}
+{% include 'web/header.html' %}
+<div id="container">
+    <select id="viewTypeSelector">
+        <option value="overview">Overview</option>
+        <option value="daily">Daily</option>
+    </select>
+
+    <div class="swapable" x-view="overview" id="overview">
+        最新の20件のみ表示しています。手動でプレイ履歴を登録するには<a href="{% url 'web:manual-check' %}">ここ</a>を押してください。
+        <table class="apexability-table">
+            <thead class="table-header">
+                <tr class="header-row">
+                    <th class="header-cell">Name</th>
+                    <th class="header-cell">Type</th>
+                    <th class="header-cell">Time</th>
+                </tr>
+            </thead>
+            <tbody id="apexabilityBody">
+            </tbody>
+        </table>
+        <canvas id="monthChart"></canvas>
+    </div>
+
+    <div class="swapable" x-view="daily" id="daily">
+        <input type="date" id="dateSelector">
+        <button id="dateTodayButton">Today</button>
+        <div id="dailyCanvasTarget"></div>
+    </div>
+</div>
+<script src="{% static 'web/apexability.js' %}" type="module"></script>
+{% endblock body %}

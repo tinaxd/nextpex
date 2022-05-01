@@ -1,0 +1,34 @@
+.menu-title {
+    font-weight: bold;
+}
+
+.menubar {
+    display: flex;
+    background-color: lightgray;
+}
+
+.menu-item {
+    flex: auto;
+    padding: 5px;
+    text-align: center;
+    font-family: system-ui;
+    height: 1em;
+    align-items: center;
+    display: inline;
+    margin-top: 1em;
+    margin-bottom: 1em;
+}
+
+.menu-item img {
+    height: 1em;
+    cursor: pointer;
+}
+
+.menu-link {
+    text-decoration: none;
+}
+
+.menu-active {
+    font-weight: bold;
+    color: deepskyblue;
+}

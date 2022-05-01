@@ -1,0 +1,14 @@
+{% load static %}
+
+<link rel="stylesheet" href="{% static 'web/header.css' %}" type="text/css">
+<div class="menubar">
+    <p class="menu-item menu-title">NextPex</p>
+    <a class="menu-item menu-link" href="{% url 'web:level' %}">レベル</a>
+    <a class="menu-item menu-link" href="{% url 'web:rank' %}">ランク</a>
+    <a class="menu-item menu-link" href="{% url 'web:apexability' %}">プレイ履歴</a>
+    <a class="menu-item menu-link" href="{% url 'web:account' %}">pexアカウント</a>
+    <!-- <p class="menu-item menu-link"><img src="{% static 'web/img/setting.png' %}"></p> -->
+</div>
+<div>
+    
+</div>

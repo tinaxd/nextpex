@@ -1,0 +1,22 @@
+{% extends 'web/base.html' %}
+{% load static %}
+{% block header %}
+<link rel="stylesheet" href="{% static 'web/account.css' %}">
+{% endblock header %}
+
+{% block body %}
+{% include 'web/header.html' %}
+<div id="container">
+    {% include 'web/account_header.html' %}
+
+    <p>前もってアカウントページでプレイヤーとリンクしておいてください。</p>
+
+    <div>
+        <form action="{% url 'web:manual-check' %}" method="POST">
+            {% csrf_token %}
+            {{form.as_p}}
+            <button type="submit" class="go go-primary">登録</button>
+        </form>
+    </div>
+</div>
+{% endblock body %}

@@ -1,0 +1,40 @@
+{% extends 'web/base.html' %}
+{% load static %}
+{% block header %}
+<link rel="stylesheet" href="{% static 'web/account.css' %}">
+<link rel="stylesheet" href="{% static 'web/link_approve.css' %}">
+{% endblock header %}
+
+{% block body %}
+{% include 'web/header.html' %}
+<div id="container">
+    {% if not pendings %}
+    <p>リンク要求がありません。</p>
+    {% endif %}
+    {% for p in pendings %}
+    <div class="entry-table">
+        <p class="label user">User</p>
+        <p class="value user">{{p.user.username}}</p>
+        
+        <p class="label player">Player</p>
+        <p class="value player">{{p.player.display_name}}</p>
+        <div class="entry-actions">
+            <form action="{% url 'web:link-approve' %}" method="POST">
+                {% csrf_token %}
+                <input type="hidden" value="approve" name="action">
+                <input type="hidden" value="{{p.user.username}}" name="username">
+                <input type="hidden" value="{{p.player.id}}" name="player_id">
+                <button type="submit" class="go go-primary">承認</button>
+            </form>
+            <form action="{% url 'web:link-approve' %}" method="POST">
+                {% csrf_token %}
+                <input type="hidden" value="reject" name="action">
+                <input type="hidden" value="{{p.user.username}}" name="username">
+                <input type="hidden" value="{{p.player.id}}" name="player_id">
+                <button type="submit"class="go go-danger">拒否</button>
+            </form>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endblock body %}
