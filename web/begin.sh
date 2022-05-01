@@ -1,2 +1,2 @@
 #!/bin/sh
-sleep 5 && python manage.py migrate && python manage.py collectstatic && gunicorn oneapex.wsgi
+sleep 10 && python manage.py migrate --noinput && python manage.py collectstatic --noinput && gunicorn -b 0.0.0.0:8000 oneapex.wsgi

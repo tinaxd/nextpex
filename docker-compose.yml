@@ -31,8 +31,8 @@ services:
     profiles:
       - bot
   web:
-    build: ./front
+    build: ./web
     ports:
-      - "3602:80"
+      - "3602:8000"
 volumes:
   dbdata:
