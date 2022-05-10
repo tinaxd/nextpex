@@ -22,6 +22,7 @@ services:
       - "3600:3306"
     volumes:
       - "dbdata:/var/lib/mysql"
+    restart: always
   bot:
     build: ./bot
     env_file:
@@ -30,9 +31,11 @@ services:
       - api
     profiles:
       - bot
+    restart: always
   web:
     build: ./web
     ports:
       - "3602:8000"
+    restart: always
 volumes:
   dbdata:
