@@ -19,6 +19,7 @@ type Environments struct {
 	DIAMOND_BADGE      string
 	MARIADB_USER       string
 	MARIADB_PASSWORD   string
+	MARIADB_PORT       string
 	MARIADB_DATABASE   string
 }
 
@@ -49,6 +50,7 @@ func LoadEnv(debug bool) Environments {
 	env.DIAMOND_BADGE = os.Getenv("DIAMOND_BADGE")
 	env.MARIADB_USER = os.Getenv("MARIADB_USER")
 	env.MARIADB_PASSWORD = os.Getenv("MARIADB_PASSWORD")
+	env.MARIADB_PORT = os.Getenv("MARIADB_PORT")
 	env.MARIADB_DATABASE = os.Getenv("MARIADB_DATABASE")
 
 	return *env

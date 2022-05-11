@@ -48,5 +48,7 @@ services:
     tty: true
     volumes:
       - ./watcher:/usr/src/app
+    ports:
+      - "8088:1323"
 volumes:
   dbdata:

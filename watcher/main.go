@@ -3,11 +3,34 @@ package main
 import (
 	"apexstalker-go/models"
 	"fmt"
+	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v4/middleware"
 	"log"
+	"net/http"
 	"time"
 )
 
 var envs models.Environments
+
+func main() {
+	// Echo instance
+	e := echo.New()
+
+	// Middleware
+	e.Use(middleware.Logger())
+	e.Use(middleware.Recover())
+
+	// Routes
+	e.GET("/", hello)
+	e.GET("/watcher/all", getStatsUpdate)
+
+	// Start server
+	e.Logger.Fatal(e.Start(":1323"))
+}
+
+func hello(c echo.Context) error {
+	return c.String(http.StatusOK, "Hello, World!")
+}
 
 func rankDiff(old int, new int) string {
 	diff := new - old
@@ -49,7 +72,7 @@ func compare(old models.UserData, new models.ApexStats) (bool, *[]models.Discord
 	return hasUpdate, &messageField, &userDataDetail
 }
 
-func main() {
+func getStatsUpdate(c echo.Context) error {
 	// Load environment values
 	envs = models.LoadEnv(true)
 
@@ -92,4 +115,5 @@ func main() {
 			models.SendMessage(envs.DISCORD_ENDPOINT, msgObj)
 		}
 	}
+	return c.JSON(http.StatusOK, "ok")
 }
