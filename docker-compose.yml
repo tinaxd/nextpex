@@ -12,7 +12,6 @@ services:
   #   depends_on:
   #     - db
   db:
-    container_name: nextpex-db
     image: mariadb:latest
     environment:
       - MARIADB_USER=nextpex
