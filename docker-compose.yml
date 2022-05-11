@@ -38,5 +38,15 @@ services:
     ports:
       - "3602:8000"
     restart: always
+
+  watcher:
+    container_name: rankwatcher
+    build:
+      context: watcher
+      dockerfile: Dockerfile
+    restart: always
+    tty: true
+    volumes:
+      - ./watcher:/usr/src/app
 volumes:
   dbdata:
