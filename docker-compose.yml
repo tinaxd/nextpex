@@ -22,6 +22,7 @@ services:
       - "3600:3306"
     volumes:
       - "dbdata:/var/lib/mysql"
+      - ./initdb.d:/docker-entrypoint-initdb.d
     restart: always
   bot:
     build: ./bot
