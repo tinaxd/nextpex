@@ -66,14 +66,17 @@ func compare(old models.UserData, new models.ApexStats) (bool, *[]models.Discord
 	if timestamp > int64(old.LastUpdate) && int(new.Data.Segments[0].Stats.Level.Value) > old.Stats.Level {
 		hasUpdate = true
 		messageField = append(messageField, models.DiscordField{Name: "レベル", Value: fmt.Sprint(old.Stats.Level) + "→" + fmt.Sprint(level) + rankDiff(old.Stats.Level, level) + ":laughing:", Inline: false})
+		models.PostLevel(&envs, old.Uid, old.Stats.Level, level)
 	}
 	if timestamp > int64(old.LastUpdate) && int(new.Data.Segments[0].Stats.RankScore.Value) != old.Stats.TrioRank {
 		hasUpdate = true
 		messageField = append(messageField, models.DiscordField{Name: "トリオRank", Value: models.GetTierBadge(&envs, old.Stats.TrioRank, "trio") + fmt.Sprint(old.Stats.TrioRank) + "→" + models.GetTierBadge(&envs, trioRank, "trio") + fmt.Sprint(trioRank) + rankDiff(old.Stats.TrioRank, trioRank), Inline: false})
+		models.PostRank(&envs, old.Uid, "trio", old.Stats.TrioRank, trioRank)
 	}
 	if timestamp > int64(old.LastUpdate) && int(new.Data.Segments[0].Stats.ArenaRankScore.Value) != old.Stats.ArenaRank {
 		hasUpdate = true
 		messageField = append(messageField, models.DiscordField{Name: "アリーナRank", Value: models.GetTierBadge(&envs, old.Stats.ArenaRank, "arena") + fmt.Sprint(old.Stats.ArenaRank) + "→" + models.GetTierBadge(&envs, arenaRank, "arena") + fmt.Sprint(arenaRank) + rankDiff(old.Stats.ArenaRank, arenaRank), Inline: false})
+		models.PostRank(&envs, old.Uid, "arena", old.Stats.ArenaRank, arenaRank)
 	}
 
 	userDataDetail := models.UserDataDetail{Level: level, TrioRank: trioRank, ArenaRank: arenaRank}
@@ -122,7 +125,7 @@ func getAllStats(c echo.Context) error {
 	defer db.Close()
 
 	// Load old stats list
-	userList := models.GetPlayerData(db, nil)
+	userList := models.GetPlayerData(db, "")
 	updateStats(db, userList)
 
 	return c.JSON(http.StatusOK, "ok")
@@ -135,7 +138,7 @@ func getSingleStats(c echo.Context) error {
 	defer db.Close()
 
 	// Load old stats list
-	userList := models.GetPlayerData(db, &userID)
+	userList := models.GetPlayerData(db, userID)
 	updateStats(db, userList)
 
 	return c.JSON(http.StatusOK, "ok")

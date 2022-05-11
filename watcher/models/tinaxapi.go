@@ -25,7 +25,7 @@ type rank struct {
 	RankType    string `json:"rank_type"`
 }
 
-func postLevel(e *Environments, userID string, oldLevel, newLevel int) {
+func PostLevel(e *Environments, userID string, oldLevel, newLevel int) {
 	timestamp := time.Now().Unix()
 	jsonData, _ := json.Marshal(level{
 		PlayerName: userID,
@@ -33,7 +33,7 @@ func postLevel(e *Environments, userID string, oldLevel, newLevel int) {
 		OldLevel:   oldLevel,
 		NewLevel:   newLevel,
 	})
-	res, err := http.Post(e.TINAX_API_ENDPOINT+"/level/register", "application/json", bytes.NewBuffer(jsonData))
+	res, err := http.Post(e.TINAX_API_ENDPOINT+"/api/compat/level/register", "application/json", bytes.NewBuffer(jsonData))
 	defer res.Body.Close()
 
 	if err != nil {
@@ -43,7 +43,7 @@ func postLevel(e *Environments, userID string, oldLevel, newLevel int) {
 	}
 }
 
-func postRank(e *Environments, userID, rankType string, oldRank, newRank int) {
+func PostRank(e *Environments, userID, rankType string, oldRank, newRank int) {
 	timestamp := time.Now().Unix()
 	jsonData, _ := json.Marshal(rank{
 		PlayerName:  userID,
@@ -54,7 +54,7 @@ func postRank(e *Environments, userID, rankType string, oldRank, newRank int) {
 		NewRankName: GetRankName(newRank, rankType),
 		RankType:    rankType,
 	})
-	res, err := http.Post(e.TINAX_API_ENDPOINT+"/rank/register", "application/json", bytes.NewBuffer(jsonData))
+	res, err := http.Post(e.TINAX_API_ENDPOINT+"/api/compat/rank/register", "application/json", bytes.NewBuffer(jsonData))
 	defer res.Body.Close()
 
 	if err != nil {

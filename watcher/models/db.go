@@ -30,14 +30,14 @@ func Connect(e *Environments) *sql.DB {
 	return db
 }
 
-func GetPlayerData(db *sql.DB, userID *string) []UserData {
+func GetPlayerData(db *sql.DB, userID string) []UserData {
 	var userData []UserData
 	var rows *sql.Rows
 	var err error
-	if userID == nil {
+	if userID == "" {
 		rows, err = db.Query(`SELECT uid, platform, level, trio_rank, arena_rank, last_update FROM user_data`)
 	} else {
-		rows, err = db.Query(`SELECT uid, platform, level, trio_rank, arena_rank, last_update FROM user_data WHERE uid =?`, *userID)
+		rows, err = db.Query(`SELECT uid, platform, level, trio_rank, arena_rank, last_update FROM user_data WHERE uid =?`, userID)
 	}
 
 	if err != nil {
