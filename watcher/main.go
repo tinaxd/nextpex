@@ -2,17 +2,21 @@ package main
 
 import (
 	"apexstalker-go/models"
+	"database/sql"
 	"fmt"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"log"
 	"net/http"
+	"strconv"
 	"time"
 )
 
 var envs models.Environments
 
 func main() {
+	// Load environment values
+	envs = models.LoadEnv(false)
 	// Echo instance
 	e := echo.New()
 
@@ -22,7 +26,12 @@ func main() {
 
 	// Routes
 	e.GET("/", hello)
-	e.GET("/watcher/all", getStatsUpdate)
+	e.GET("/watcher/all", getAllStats)
+	e.GET("/watcher/:user", getSingleStats)
+	e.GET("/register/:user/:platform", registerPlayer)
+	e.GET("/delete/:user", deletePlayer)
+	e.GET("/update/uid/:old/:new", updatePlayerID)
+	e.GET("/update/data/:type/:user/:data", updatePlayerData)
 
 	// Start server
 	e.Logger.Fatal(e.Start(":1323"))
@@ -60,11 +69,11 @@ func compare(old models.UserData, new models.ApexStats) (bool, *[]models.Discord
 	}
 	if timestamp > int64(old.LastUpdate) && int(new.Data.Segments[0].Stats.RankScore.Value) != old.Stats.TrioRank {
 		hasUpdate = true
-		messageField = append(messageField, models.DiscordField{Name: "トリオRank", Value: models.GetTrioTierBadge(&envs, old.Stats.TrioRank) + fmt.Sprint(old.Stats.TrioRank) + "→" + models.GetTrioTierBadge(&envs, trioRank) + fmt.Sprint(trioRank) + rankDiff(old.Stats.TrioRank, trioRank), Inline: false})
+		messageField = append(messageField, models.DiscordField{Name: "トリオRank", Value: models.GetTierBadge(&envs, old.Stats.TrioRank, "trio") + fmt.Sprint(old.Stats.TrioRank) + "→" + models.GetTierBadge(&envs, trioRank, "trio") + fmt.Sprint(trioRank) + rankDiff(old.Stats.TrioRank, trioRank), Inline: false})
 	}
 	if timestamp > int64(old.LastUpdate) && int(new.Data.Segments[0].Stats.ArenaRankScore.Value) != old.Stats.ArenaRank {
 		hasUpdate = true
-		messageField = append(messageField, models.DiscordField{Name: "アリーナRank", Value: models.GetArenaTierBadge(&envs, old.Stats.ArenaRank) + fmt.Sprint(old.Stats.ArenaRank) + "→" + models.GetArenaTierBadge(&envs, arenaRank) + fmt.Sprint(arenaRank) + rankDiff(old.Stats.ArenaRank, arenaRank), Inline: false})
+		messageField = append(messageField, models.DiscordField{Name: "アリーナRank", Value: models.GetTierBadge(&envs, old.Stats.ArenaRank, "arena") + fmt.Sprint(old.Stats.ArenaRank) + "→" + models.GetTierBadge(&envs, arenaRank, "arena") + fmt.Sprint(arenaRank) + rankDiff(old.Stats.ArenaRank, arenaRank), Inline: false})
 	}
 
 	userDataDetail := models.UserDataDetail{Level: level, TrioRank: trioRank, ArenaRank: arenaRank}
@@ -72,17 +81,7 @@ func compare(old models.UserData, new models.ApexStats) (bool, *[]models.Discord
 	return hasUpdate, &messageField, &userDataDetail
 }
 
-func getStatsUpdate(c echo.Context) error {
-	// Load environment values
-	envs = models.LoadEnv(true)
-
-	// Create db connection client
-	db := models.Connect(&envs)
-	defer db.Close()
-
-	// Load old stats list
-	userList := models.GetPlayerData(db)
-
+func updateStats(db *sql.DB, userList []models.UserData) {
 	for _, v := range userList {
 		fmt.Printf("Old: %+v\n", v)
 
@@ -115,5 +114,105 @@ func getStatsUpdate(c echo.Context) error {
 			models.SendMessage(envs.DISCORD_ENDPOINT, msgObj)
 		}
 	}
+}
+
+func getAllStats(c echo.Context) error {
+	// Create db connection client
+	db := models.Connect(&envs)
+	defer db.Close()
+
+	// Load old stats list
+	userList := models.GetPlayerData(db, nil)
+	updateStats(db, userList)
+
 	return c.JSON(http.StatusOK, "ok")
+}
+
+func getSingleStats(c echo.Context) error {
+	userID := c.Param("user")
+	// Create db connection client
+	db := models.Connect(&envs)
+	defer db.Close()
+
+	// Load old stats list
+	userList := models.GetPlayerData(db, &userID)
+	updateStats(db, userList)
+
+	return c.JSON(http.StatusOK, "ok")
+}
+
+func registerPlayer(c echo.Context) error {
+	userID := c.Param("user")
+	platform := c.Param("platform")
+	// Create db connection client
+	db := models.Connect(&envs)
+	defer db.Close()
+
+	success := models.RegisterPlayer(db, userID, platform)
+	if success {
+		return c.JSON(http.StatusOK, "registered")
+	} else {
+		return c.JSON(http.StatusInternalServerError, "failed to register")
+	}
+}
+
+func deletePlayer(c echo.Context) error {
+	userID := c.Param("user")
+	// Create db connection client
+	db := models.Connect(&envs)
+	defer db.Close()
+
+	success := models.DeletePlayer(db, userID)
+	if success {
+		return c.JSON(http.StatusOK, "deleted")
+	} else {
+		return c.JSON(http.StatusInternalServerError, "failed to delete")
+	}
+}
+
+func updatePlayerID(c echo.Context) error {
+	oldUserID := c.Param("old")
+	newUserID := c.Param("new")
+	// Create db connection client
+	db := models.Connect(&envs)
+	defer db.Close()
+
+	success := models.UpdatePlayerID(db, oldUserID, newUserID)
+	if success {
+		return c.JSON(http.StatusOK, "updated")
+	} else {
+		return c.JSON(http.StatusInternalServerError, "failed to update")
+	}
+}
+
+func updatePlayerData(c echo.Context) error {
+	updateType := c.Param("type")
+	userID := c.Param("user")
+	data, _ := strconv.Atoi(c.Param("data"))
+	// Create db connection client
+	db := models.Connect(&envs)
+	defer db.Close()
+
+	var success bool
+	var msg string
+	switch updateType {
+	case "level":
+		success = models.UpdatePlayerLevel(db, userID, data)
+		msg = "updated level"
+	case "trio":
+		success = models.UpdatePlayerTrioRank(db, userID, data)
+		msg = "updated trio rank"
+	case "arena":
+		success = models.UpdatePlayerArenaRank(db, userID, data)
+		msg = "updated arena rank"
+	default:
+		success = false
+		msg = "Unimplemented update type"
+	}
+
+	if success {
+		return c.JSON(http.StatusOK, msg)
+	} else {
+		return c.JSON(http.StatusInternalServerError, msg)
+	}
 }

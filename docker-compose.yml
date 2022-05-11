@@ -12,6 +12,7 @@ services:
   #   depends_on:
   #     - db
   db:
+    container_name: nextpex-db
     image: mariadb:latest
     environment:
       - MARIADB_USER=nextpex
@@ -40,7 +41,9 @@ services:
     restart: always
 
   watcher:
-    container_name: rankwatcher
+    container_name: nextpex-watcher
+    env_file:
+      - watcher/.env
     build:
       context: watcher
       dockerfile: Dockerfile
