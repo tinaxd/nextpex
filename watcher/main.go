@@ -105,8 +105,7 @@ func updateStats(db *sql.DB, userList []models.UserData) {
 		// Send notification if there was an update in stats
 		if hasUpdate {
 			msgObj := new(models.DiscordWebhook)
-			msgObj.UserName = "Go BOT"
-			msgObj.AvatarURL = "https://pbs.twimg.com/profile_images/1108370004590772224/hEX1gucp_400x400.jpg"
+			msgObj.UserName = "Apex Rank Watcher"
 			msgObj.Embeds = []models.DiscordEmbed{
 				{
 					Title:  "\U0001F38A" + v.Uid + "の戦績変化\U0001F389",
