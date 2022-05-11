@@ -22,6 +22,7 @@ services:
       - "3600:3306"
     volumes:
       - "dbdata:/var/lib/mysql"
+      - ./initdb.d:/docker-entrypoint-initdb.d
     restart: always
   bot:
     build: ./bot
@@ -37,5 +38,19 @@ services:
     ports:
       - "3602:8000"
     restart: always
+
+  watcher:
+    container_name: nextpex-watcher
+    env_file:
+      - watcher/.env
+    build:
+      context: watcher
+      dockerfile: Dockerfile
+    restart: always
+    tty: true
+    volumes:
+      - ./watcher:/usr/src/app
+    ports:
+      - "8088:1323"
 volumes:
   dbdata:
