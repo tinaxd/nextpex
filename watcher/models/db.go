@@ -23,16 +23,22 @@ type UserDataDetail struct {
 
 func Connect(e *Environments) *sql.DB {
 	// Create db client
-	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(localhost:3600)/%s", e.MARIADB_USER, e.MARIADB_PASSWORD, e.MARIADB_DATABASE))
+	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s:%s)/%s", e.MARIADB_USER, e.MARIADB_PASSWORD, e.MARIADB_HOST, e.MARIADB_PORT, e.MARIADB_DATABASE))
 	if err != nil {
 		log.Fatalf("db connect error: %v", err)
 	}
 	return db
 }
 
-func GetPlayerData(db *sql.DB) []UserData {
+func GetPlayerData(db *sql.DB, userID *string) []UserData {
 	var userData []UserData
-	rows, err := db.Query(`SELECT uid, platform, level, trio_rank, arena_rank, last_update FROM user_data`)
+	var rows *sql.Rows
+	var err error
+	if userID == nil {
+		rows, err = db.Query(`SELECT uid, platform, level, trio_rank, arena_rank, last_update FROM user_data`)
+	} else {
+		rows, err = db.Query(`SELECT uid, platform, level, trio_rank, arena_rank, last_update FROM user_data WHERE uid =?`, *userID)
+	}
 
 	if err != nil {
 		panic(err)
@@ -59,6 +65,66 @@ func UpsertPlayerData(db *sql.DB, u UserData) {
 		log.Fatal(err)
 		return
 	}
+}
+
+func RegisterPlayer(db *sql.DB, userID, platform string) bool {
+	query := `INSERT INTO user_data (uid, platform) values (?, ?)`
+	_, err := db.Exec(query, userID, platform)
+	if err != nil {
+		fmt.Println(err)
+		return false
+	}
+	return true
+}
+
+func DeletePlayer(db *sql.DB, userID string) bool {
+	query := `DELETE FROM user_data where uid=?`
+	_, err := db.Exec(query, userID)
+	if err != nil {
+		fmt.Println(err)
+		return false
+	}
+	return true
+}
+
+func UpdatePlayerID(db *sql.DB, oldUserID, newUserID string) bool {
+	query := `UPDATE user_data set uid=? WHERE uid=?`
+	_, err := db.Exec(query, newUserID, oldUserID)
+	if err != nil {
+		fmt.Println(err)
+		return false
+	}
+	return true
+}
+
+func UpdatePlayerLevel(db *sql.DB, userID string, level int) bool {
+	query := `UPDATE user_data set level=? WHERE uid=?`
+	_, err := db.Exec(query, level, userID)
+	if err != nil {
+		fmt.Println(err)
+		return false
+	}
+	return true
+}
+
+func UpdatePlayerTrioRank(db *sql.DB, userID string, trioRank int) bool {
+	query := `UPDATE user_data set trio_rank=? WHERE uid=?`
+	_, err := db.Exec(query, trioRank, userID)
+	if err != nil {
+		fmt.Println(err)
+		return false
+	}
+	return true
+}
+
+func UpdatePlayerArenaRank(db *sql.DB, userID string, arenaRank int) bool {
+	query := `UPDATE user_data set arena_rank=? WHERE uid=?`
+	_, err := db.Exec(query, arenaRank, userID)
+	if err != nil {
+		fmt.Println(err)
+		return false
+	}
+	return true
 }
 
 func UpdatePlayerData(db *sql.DB, userID string, ud UserDataDetail) {

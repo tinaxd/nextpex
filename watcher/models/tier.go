@@ -1,33 +1,83 @@
 package models
 
-func GetTrioTierBadge(env *Environments, rank int) string {
-	var badge string
-	switch {
-	case rank < 1200:
-		badge = env.BRONZE_BADGE
-	case rank < 2800:
-		badge = env.SILVER_BADGE
-	case rank < 4800:
-		badge = env.GOLD_BADGE
-	case rank < 7200:
-		badge = env.PLATINUM_BADGE
-	default:
-		badge = env.DIAMOND_BADGE
-	}
+const (
+	TrioBronze    = 1200
+	TrioSilver    = 2800
+	TrioGold      = 4800
+	TrioPlatinum  = 7200
+	TrioDiamond   = 10000
+	ArenaBronze   = 1600
+	ArenaSilver   = 3200
+	ArenaGold     = 4800
+	ArenaPlatinum = 6400
+	ArenaDiamond  = 8000
+)
 
-	return badge
+func getUpperLimit(tier, types string) int {
+	limit := 0
+	switch tier {
+	case "bronze":
+		if types == "trio" {
+			limit = TrioBronze
+		} else {
+			limit = ArenaBronze
+		}
+	case "silver":
+		if types == "trio" {
+			limit = TrioSilver
+		} else {
+			limit = ArenaSilver
+		}
+	case "gold":
+		if types == "trio" {
+			limit = TrioGold
+		} else {
+			limit = ArenaGold
+		}
+	case "platinum":
+		if types == "trio" {
+			limit = TrioPlatinum
+		} else {
+			limit = ArenaPlatinum
+		}
+	case "diamond":
+		if types == "trio" {
+			limit = TrioDiamond
+		} else {
+			limit = ArenaDiamond
+		}
+	}
+	return limit
 }
 
-func GetArenaTierBadge(env *Environments, rank int) string {
+func GetRankName(rank int, types string) string {
+	var rankName string
+	switch {
+	case rank < getUpperLimit("bronze", types):
+		rankName = "bronze"
+	case rank < getUpperLimit("silver", types):
+		rankName = "silver"
+	case rank < getUpperLimit("gold", types):
+		rankName = "gold"
+	case rank < getUpperLimit("platinum", types):
+		rankName = "platinum"
+	default:
+		rankName = "diamond"
+	}
+
+	return rankName
+}
+
+func GetTierBadge(env *Environments, rank int, types string) string {
 	var badge string
 	switch {
-	case rank < 1600:
+	case rank < getUpperLimit("bronze", types):
 		badge = env.BRONZE_BADGE
-	case rank < 3200:
+	case rank < getUpperLimit("silver", types):
 		badge = env.SILVER_BADGE
-	case rank < 4800:
+	case rank < getUpperLimit("gold", types):
 		badge = env.GOLD_BADGE
-	case rank < 6400:
+	case rank < getUpperLimit("platinum", types):
 		badge = env.PLATINUM_BADGE
 	default:
 		badge = env.DIAMOND_BADGE
