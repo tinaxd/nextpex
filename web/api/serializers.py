@@ -49,17 +49,24 @@ class ApexabilityCheckSerializer(serializers.Serializer):
     in_game_name = serializers.CharField()
     type = serializers.ChoiceField([('start', 'Start'), ('stop', 'Stop')])
     time = serializers.DateTimeField()
+    game_name = serializers.CharField()
 
     def validate_in_game_name(self, value):
         if not wm.InGameName.objects.filter(in_game_name=value).exists():
             raise ValidationError("no players with that in_game_name exist")
         return value
 
+    def validate_game_name(self, value):
+        if not wm.Game.objects.filter(name=value).exists():
+            raise ValidationError("no game with that name registered")
+        return value
+
     def create(self, validated_data):
         player = wm.InGameName.objects.filter(
             in_game_name=validated_data['in_game_name']).first().player
+        game = wm.Game.objects.filter(name=validated_data["game_name"]).first()
         wm.ApexabilityCheck.objects.create(
-            player=player, entry_type=validated_data['type'], time=validated_data['time'])
+            player=player, entry_type=validated_data['type'], time=validated_data['time'], played_game=game)
         return validated_data
 
 
