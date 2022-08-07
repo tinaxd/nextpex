@@ -79,6 +79,14 @@ class RankUpdate(models.Model):
         ]
 
 
+class Game(models.Model):
+    name = models.CharField(max_length=64, blank=False,
+                            null=False, unique=True)
+
+    def __str__(self) -> str:
+        return f"Game {self.name}"
+
+
 class ApexabilityCheck(models.Model):
     class StartStopType(models.TextChoices):
         START = 'start', 'Start'
@@ -88,6 +96,8 @@ class ApexabilityCheck(models.Model):
     entry_type = models.CharField(
         choices=StartStopType.choices, blank=False, null=False, max_length=5)
     time = models.DateTimeField(blank=False, null=False)
+    played_game = models.ForeignKey(
+        Game, blank=True, null=True, on_delete=models.SET_NULL)
 
     def as_dict(self):
         return {
@@ -97,7 +107,7 @@ class ApexabilityCheck(models.Model):
         }
 
     def __str__(self):
-        return f'{self.player} {self.entry_type}s at {self.time}'
+        return f'{self.player} {self.played_game} {self.entry_type}s at {self.time}'
 
     class Meta:
         indexes = [
