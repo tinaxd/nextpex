@@ -1,4 +1,5 @@
-import discord # type: ignore
+from optparse import Option
+import discord  # type: ignore
 import os
 import sys
 from typing import Dict, cast, Optional, Tuple, Union
@@ -34,6 +35,7 @@ intents.presences = True
 intents.reactions = True
 client = discord.Client(intents=intents)
 
+
 def _find_channel(guild: discord.Guild, chan_name: str) -> Optional[discord.TextChannel]:
     for chan in guild.channels:
         if not isinstance(chan, discord.TextChannel):
@@ -43,7 +45,9 @@ def _find_channel(guild: discord.Guild, chan_name: str) -> Optional[discord.Text
     logging.info(f'could not find #{chan_name} in {guild.name}')
     return None
 
+
 NOTIFYCHAN = 'apexability-check'
+
 
 def find_APEXable_role(guild: discord.Guild) -> Optional[discord.Role]:
     roles = guild.roles
@@ -51,6 +55,7 @@ def find_APEXable_role(guild: discord.Guild) -> Optional[discord.Role]:
         if role.name == "APEXable":
             return role
     return None
+
 
 async def _apex_role_change(member: discord.Member, on: bool) -> None:
     role = find_APEXable_role(member.guild)
@@ -61,14 +66,18 @@ async def _apex_role_change(member: discord.Member, on: bool) -> None:
     else:
         await member.remove_roles(role)
 
-def _oneapex_apexability(name: str, is_start: bool, time: datetime) -> None:
+
+def _oneapex_apexability(name: str, is_start: bool, game_name: str, time: datetime) -> None:
     result = requests.post(WEB_API + "/register/check", json={
         "in_game_name": name,
         "type": "start" if is_start else "stop",
-        "time": time.isoformat()
+        "time": time.isoformat(),
+        "game_name": game_name
     })
     if result.status_code != 200:
-        logging.warning(f'api returned non 200 status code!: {result.content}')
+        logging.warning(
+            f"api returned non 200 status code!: {result.content!s}")
+
 
 async def _send_apex_notification(member: discord.Member, game: str, is_start: bool) -> None:
     guild = member.guild
@@ -80,16 +89,24 @@ async def _send_apex_notification(member: discord.Member, game: str, is_start: b
             tail = 'をやめました！'
         content = f'{member.display_name} が {game} {tail}'
         await chan.send(content=content)
-        await _apex_role_change(member, is_start)
-        _oneapex_apexability(member.display_name, is_start, datetime.now(tz=dt.timezone(dt.timedelta())))
+        if game == 'Apex Legends':
+            await _apex_role_change(member, is_start)
+        _oneapex_apexability(member.display_name, is_start, game,
+                             datetime.now(tz=dt.timezone(dt.timedelta())))
 
 ActType = Union[discord.BaseActivity, discord.Spotify]
-APEXGAME = "Apex Legends"
+watched_games = set([
+    'Apex Legends',
+    'Rust',
+    'Fall Guys',
+    'Minecraft',
+])
 
 SELFAPEXCHAN = "self-apexability"
 
 # mapping from GuildId to the id of the message for whose reaction ApexBot should watch for Apexability detection.
 watched_msg: Dict[int, int] = {}
+
 
 async def send_apexability_msg(guild: discord.Guild) -> None:
     chan = _find_channel(guild, SELFAPEXCHAN)
@@ -110,58 +127,72 @@ async def send_apexability_msg(guild: discord.Guild) -> None:
     watched_msg[guild.id] = msg.id
     await msg.add_reaction(apex_emoji)
 
-def apex_started(oldActs: Tuple[ActType], newActs: Tuple[ActType]) -> bool:
+
+def apex_started(oldActs: Tuple[ActType], newActs: Tuple[ActType]) -> Optional[str]:
     # APEX はプレイしていなかったことを確認
     for act in oldActs:
         if (isinstance(act, discord.Spotify)):
             continue
-        if act.type == discord.ActivityType.playing and act.name == APEXGAME:
-            return False
-    
+        if act.type == discord.ActivityType.playing and act.name in watched_games:
+            return None
+
     # 今 APEX をプレイしていることを確認
     for act in newActs:
         if (isinstance(act, discord.Spotify)):
             continue
-        if act.type == discord.ActivityType.playing and act.name == APEXGAME:
-            return True
-    return False
+        if act.type == discord.ActivityType.playing and act.name in watched_games:
+            return act.name
+    return None
 
-def apex_stopped(oldActs: Tuple[ActType], newActs: Tuple[ActType]) -> bool:
-    # APEX をプレイしていたことを確認
-    apexed = False
+
+def apex_stopped(oldActs: Tuple[ActType], newActs: Tuple[ActType]) -> Optional[str]:
+    # game をプレイしていたことを確認
+    gamed = False
+    game_name: str = ""
     for act in oldActs:
         if (isinstance(act, discord.Spotify)):
             continue
-        if act.type == discord.ActivityType.playing and act.name == APEXGAME:
-            apexed = True
+        if act.type == discord.ActivityType.playing and act.name in watched_games:
+            gamed = True
+            game_name = act.name
             break
-    if not apexed:
-        return False
-    
+    if not gamed:
+        return None
+
     # 今 APEX をプレイしていないことを確認
     for act in newActs:
         if (isinstance(act, discord.Spotify)):
             continue
-        if act.type == discord.ActivityType.playing and act.name == APEXGAME:
-            return False
-    return True
+        if act.type == discord.ActivityType.playing and act.name in watched_games:
+            return None
+    return game_name
+
 
 @client.event
 async def on_member_update(before: discord.Member, after: discord.Member) -> None:
     logging.debug(f'member update ${str(before)} ${after}')
-    
+
     started = apex_started(before.activities, after.activities)
     stopped = apex_stopped(before.activities, after.activities)
-    if not started and not stopped:
+    if started is None and stopped is None:
         logging.debug("not related to apex")
         return
-    
-    await _send_apex_notification(after, APEXGAME, started)
+
+    game_name: str = ""
+    if started:
+        game_name = started
+    else:
+        game_name = cast(str, stopped)
+
+    is_start = started is not None
+    await _send_apex_notification(after, game_name, is_start)
+
 
 @client.event
 async def on_ready():
     for guild in client.guilds:
         await send_apexability_msg(guild)
+
 
 async def reaction_handler(payload: discord.RawReactionActionEvent):
     guild_id = payload.guild_id
@@ -182,15 +213,18 @@ async def reaction_handler(payload: discord.RawReactionActionEvent):
     if member.display_name == "Apex Police":
         # member is APEXBOT itself
         return
-    
+
+    APEXGAME = "Apex Legends"
     if payload.event_type == "REACTION_ADD":
         await _send_apex_notification(member, APEXGAME, True)
     elif payload.event_type == "REACTION_REMOVE":
         await _send_apex_notification(member, APEXGAME, False)
 
+
 @client.event
 async def on_raw_reaction_add(payload):
     await reaction_handler(payload)
+
 
 @client.event
 async def on_raw_reaction_remove(payload):
