@@ -159,3 +159,7 @@ def manual_check(request):
         form = CheckForm()
 
     return render(request, 'web/manual_check.html', {'form': form, 'account_name': request.user.username})
+
+
+def root(request):
+    return redirect('web:level')

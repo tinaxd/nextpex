@@ -4,6 +4,7 @@ from . import views
 app_name = 'web'
 
 urlpatterns = [
+    path('', views.root, name='root'),
     path('rank', views.rank, name='rank'),
     path('level', views.level, name='level'),
     path('check', views.apexability, name='apexability'),
