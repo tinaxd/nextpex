@@ -127,7 +127,9 @@ class RankUpdateSerializer(serializers.ModelSerializer):
 
 class CheckSerializer(serializers.ModelSerializer):
     player = serializers.CharField(max_length=50, source='player.display_name')
+    game_name = serializers.CharField(
+        max_length=64, source='played_game.name', allow_null=True)
 
     class Meta:
         model = wm.ApexabilityCheck
-        fields = ['player', 'entry_type', 'time']
+        fields = ['player', 'entry_type', 'time', 'game_name']

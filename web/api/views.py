@@ -1,4 +1,4 @@
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponseNotFound
 from rest_framework.response import Response
 from . import serializers as ser
 from rest_framework import mixins, status

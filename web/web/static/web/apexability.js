@@ -13,6 +13,9 @@ function makeTr(entry) {
   const tdName = document.createElement('td');
   tdName.textContent = entry.player;
 
+  const tdGame = document.createElement('td');
+  tdGame.textContent = entry.game_name ?? "?";
+
   const tdType = document.createElement('td');
   if (entry.entry_type === 'start') {
     tdType.textContent = 'Start';
@@ -27,6 +30,7 @@ function makeTr(entry) {
   tdTime.textContent = parsedTime.getFullYear().toString() + '-' + (parsedTime.getMonth() + 1).toString().padStart(2, '0') + '-' + parsedTime.getDate().toString().padStart(2, '0') + ' ' + parsedTime.getHours().toString().padStart(2, '0') + ':' + parsedTime.getMinutes().toString().padStart(2, '0');
 
   tr.appendChild(tdName);
+  tr.appendChild(tdGame);
   tr.appendChild(tdType);
   tr.appendChild(tdTime);
   return tr;
