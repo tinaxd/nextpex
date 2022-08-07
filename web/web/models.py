@@ -83,6 +83,9 @@ class Game(models.Model):
     name = models.CharField(max_length=64, blank=False,
                             null=False, unique=True)
 
+    def __str__(self) -> str:
+        return f"Game {self.name}"
+
 
 class ApexabilityCheck(models.Model):
     class StartStopType(models.TextChoices):

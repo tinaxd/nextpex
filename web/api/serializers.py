@@ -1,7 +1,15 @@
 from rest_framework import serializers
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import ValidationError, APIException
 from web import models as wm
 from datetime import datetime
+
+
+class ObjectNotFoundError(APIException):
+    status_code = 404
+    default_detail = "Object not found"
+
+    def __init__(self, object_name: str) -> None:
+        self.detail = f"Specified {object_name} not found"
 
 
 class LevelUpdateSerializer(serializers.Serializer):
@@ -12,7 +20,7 @@ class LevelUpdateSerializer(serializers.Serializer):
 
     def validate_in_game_name(self, value):
         if not wm.InGameName.objects.filter(in_game_name=value).exists():
-            raise ValidationError("no players with that in_game_name exist")
+            raise ObjectNotFoundError("in_game_name")
         return value
 
     def create(self, validated_data):
@@ -34,7 +42,7 @@ class RankUpdateSerializer(serializers.Serializer):
 
     def validate_in_game_name(self, value):
         if not wm.InGameName.objects.filter(in_game_name=value).exists():
-            raise ValidationError("no players with that in_game_name exist")
+            raise ObjectNotFoundError("in_game_name")
         return value
 
     def create(self, validated_data):
@@ -53,12 +61,12 @@ class ApexabilityCheckSerializer(serializers.Serializer):
 
     def validate_in_game_name(self, value):
         if not wm.InGameName.objects.filter(in_game_name=value).exists():
-            raise ValidationError("no players with that in_game_name exist")
+            raise ObjectNotFoundError("in_game_name")
         return value
 
     def validate_game_name(self, value):
         if not wm.Game.objects.filter(name=value).exists():
-            raise ValidationError("no game with that name registered")
+            raise ObjectNotFoundError("game_name")
         return value
 
     def create(self, validated_data):
@@ -78,7 +86,7 @@ class CompatLevelUpdateSerializer(serializers.Serializer):
 
     def validate_player_name(self, value):
         if not wm.InGameName.objects.filter(in_game_name=value).exists():
-            raise ValidationError("no players with that in_game_name exist")
+            raise ObjectNotFoundError("player_name")
         return value
 
     def create(self, validated_data):
@@ -101,7 +109,7 @@ class CompatRankUpdateSerializer(serializers.Serializer):
 
     def validate_player_name(self, value):
         if not wm.InGameName.objects.filter(in_game_name=value).exists():
-            raise ValidationError("no players with that in_game_name exist")
+            raise ObjectNotFoundError("player_name")
         return value
 
     def create(self, validated_data):
