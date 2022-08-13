@@ -1,14 +1,31 @@
 import { makeURL } from "./config.js";
+import { storageAvailable } from "./util.js";
 
 const ctx = document.querySelector('#chart').getContext('2d');
 let chart = null;
 let data = [];
 let levelData = [];
 
-async function retrieveData() {
+async function retrieveDataOnline() {
     const res = await fetch(makeURL("/level"));
     const j = await res.json();
     levelData = j;
+    console.log('fetched data online');
+    saveDataToLocalStorage(levelData);
+}
+
+function retrieveDataFromLocalStorage() {
+    if (storageAvailable("localStorage")) {
+        const data = localStorage.getItem("level");
+        if (data !== null) {
+            levelData = JSON.parse(data);
+            console.log('fetched data from localStorage');
+            return true;
+        } else {
+            console.log('no data available in localStorage');
+        }
+    }
+    return false;
 }
 
 function updateData() {
@@ -53,6 +70,13 @@ function updateData() {
     }
     if (chart !== null) {
         chart.data.datasets = data;
+    }
+}
+
+function saveDataToLocalStorage(data) {
+    if (storageAvailable("localStorage")) {
+        localStorage.setItem('level', JSON.stringify(data));
+        console.log('saved level to localStorage');
     }
 }
 
@@ -118,9 +142,19 @@ function resetDragZoom(event) {
 }
 
 window.addEventListener('load', async () => {
-    await retrieveData();
-    updateData();
-    updateChart();
+    let success = false;
+    try {
+        await retrieveDataOnline();
+        success = true;
+    } catch (e) {
+        success = retrieveDataFromLocalStorage();
+    }
+    if (success) {
+        updateData();
+        updateChart();
+    } else {
+        console.warn('failed to fetch data');
+    }
 });
 
 const canvas = document.getElementById('chart');

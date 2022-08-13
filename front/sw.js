@@ -15,6 +15,7 @@ const urlsToCache = [
     'js/config.js',
     'js/menu.js',
     'js/RGBmodifier.js',
+    'js/util.js',
 ];
 
 self.addEventListener('install', (event) => {
