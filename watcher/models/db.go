@@ -3,9 +3,10 @@ package models
 import (
 	"database/sql"
 	"fmt"
-	_ "github.com/go-sql-driver/mysql"
 	"log"
 	"time"
+
+	_ "github.com/mattn/go-sqlite3"
 )
 
 type UserData struct {
@@ -23,7 +24,7 @@ type UserDataDetail struct {
 
 func Connect(e *Environments) *sql.DB {
 	// Create db client
-	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s:%s)/%s", e.MARIADB_USER, e.MARIADB_PASSWORD, e.MARIADB_HOST, e.MARIADB_PORT, e.MARIADB_DATABASE))
+	db, err := sql.Open("sqlite3", "../web/data/db.sqlite3")
 	if err != nil {
 		log.Fatalf("db connect error: %v", err)
 	}
