@@ -81,7 +81,7 @@ WSGI_APPLICATION = 'oneapex.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/3.2/ref/settings/#databases
 
-if PRODUCTION:
+if False and PRODUCTION:
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.mysql',
