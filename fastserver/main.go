@@ -100,6 +100,35 @@ func getAllLevels(c echo.Context) error {
 	return c.JSON(200, buf)
 }
 
+func getAllRanks(c echo.Context) error {
+	var ranks []struct {
+		Rank     int       `db:"rank"`
+		Time     time.Time `db:"time"`
+		Username string    `db:"username"`
+	}
+	err := db.Select(&ranks, "SELECT t.new_rank AS rank,t.timeat AS time,u.username AS username FROM RankUpdate t INNER JOIN User u ON t.user_id=u.id ORDER BY t.timeat DESC")
+	if err != nil {
+		return err
+	}
+
+	ress := make([]*types.RankResponse, len(ranks))
+	for i, r := range ranks {
+		ress[i] = &types.RankResponse{
+			Rank:     int32(r.Rank),
+			Time:     makeTimePB(r.Time),
+			Username: r.Username,
+		}
+	}
+	response := &types.AllRankResponse{
+		Ranks: ress,
+	}
+	buf, err := proto.Marshal(response)
+	if err != nil {
+		return err
+	}
+	return c.JSON(200, buf)
+}
+
 func main() {
 	// Echo instance
 	e := echo.New()

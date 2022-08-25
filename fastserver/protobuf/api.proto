@@ -21,3 +21,13 @@ message LevelResponse {
 message AllLevelResponse {
     repeated LevelResponse levels = 1;
 }
+
+message RankResponse {
+    int32 rank = 1;
+    Time time = 2;
+    string username = 3;
+}
+
+message AllRankResponse {
+    repeated RankResponse ranks = 1;
+}
