@@ -1,0 +1,23 @@
+syntax = "proto3";
+package nextpex;
+
+option go_package = "github.com/tinaxd/nextpex/types";
+
+message Time {
+    int32 hour = 1;
+    int32 minute = 2;
+    int32 second = 3;
+    int32 date = 4;
+    int32 month = 5;
+    int32 year = 6;
+}
+
+message LevelResponse {
+    int32 level = 1;
+    Time time = 2;
+    string username = 3;
+}
+
+message AllLevelResponse {
+    repeated LevelResponse levels = 1;
+}
