@@ -31,3 +31,13 @@ message RankResponse {
 message AllRankResponse {
     repeated RankResponse ranks = 1;
 }
+
+message NowPlayingResponse {
+    string username = 1;
+    string game = 2;
+    Time started_at = 3;
+}
+
+message AllNowPlayingResponse {
+    repeated NowPlayingResponse now_playings = 1;
+}

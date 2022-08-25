@@ -327,6 +327,116 @@ func (x *AllRankResponse) GetRanks() []*RankResponse {
 	return nil
 }
 
+type NowPlayingResponse struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Username  string `protobuf:"bytes,1,opt,name=username,proto3" json:"username,omitempty"`
+	Game      string `protobuf:"bytes,2,opt,name=game,proto3" json:"game,omitempty"`
+	StartedAt *Time  `protobuf:"bytes,3,opt,name=started_at,json=startedAt,proto3" json:"started_at,omitempty"`
+}
+
+func (x *NowPlayingResponse) Reset() {
+	*x = NowPlayingResponse{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_api_proto_msgTypes[5]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *NowPlayingResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*NowPlayingResponse) ProtoMessage() {}
+
+func (x *NowPlayingResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_proto_msgTypes[5]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use NowPlayingResponse.ProtoReflect.Descriptor instead.
+func (*NowPlayingResponse) Descriptor() ([]byte, []int) {
+	return file_api_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *NowPlayingResponse) GetUsername() string {
+	if x != nil {
+		return x.Username
+	}
+	return ""
+}
+
+func (x *NowPlayingResponse) GetGame() string {
+	if x != nil {
+		return x.Game
+	}
+	return ""
+}
+
+func (x *NowPlayingResponse) GetStartedAt() *Time {
+	if x != nil {
+		return x.StartedAt
+	}
+	return nil
+}
+
+type AllNowPlayingResponse struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	NowPlayings []*NowPlayingResponse `protobuf:"bytes,1,rep,name=now_playings,json=nowPlayings,proto3" json:"now_playings,omitempty"`
+}
+
+func (x *AllNowPlayingResponse) Reset() {
+	*x = AllNowPlayingResponse{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_api_proto_msgTypes[6]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *AllNowPlayingResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AllNowPlayingResponse) ProtoMessage() {}
+
+func (x *AllNowPlayingResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_proto_msgTypes[6]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AllNowPlayingResponse.ProtoReflect.Descriptor instead.
+func (*AllNowPlayingResponse) Descriptor() ([]byte, []int) {
+	return file_api_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *AllNowPlayingResponse) GetNowPlayings() []*NowPlayingResponse {
+	if x != nil {
+		return x.NowPlayings
+	}
+	return nil
+}
+
 var File_api_proto protoreflect.FileDescriptor
 
 var file_api_proto_rawDesc = []byte{
@@ -360,10 +470,23 @@ var file_api_proto_rawDesc = []byte{
 	0x41, 0x6c, 0x6c, 0x52, 0x61, 0x6e, 0x6b, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12,
 	0x2b, 0x0a, 0x05, 0x72, 0x61, 0x6e, 0x6b, 0x73, 0x18, 0x01, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x15,
 	0x2e, 0x6e, 0x65, 0x78, 0x74, 0x70, 0x65, 0x78, 0x2e, 0x52, 0x61, 0x6e, 0x6b, 0x52, 0x65, 0x73,
-	0x70, 0x6f, 0x6e, 0x73, 0x65, 0x52, 0x05, 0x72, 0x61, 0x6e, 0x6b, 0x73, 0x42, 0x21, 0x5a, 0x1f,
-	0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x74, 0x69, 0x6e, 0x61, 0x78,
-	0x64, 0x2f, 0x6e, 0x65, 0x78, 0x74, 0x70, 0x65, 0x78, 0x2f, 0x74, 0x79, 0x70, 0x65, 0x73, 0x62,
-	0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x70, 0x6f, 0x6e, 0x73, 0x65, 0x52, 0x05, 0x72, 0x61, 0x6e, 0x6b, 0x73, 0x22, 0x72, 0x0a, 0x12,
+	0x4e, 0x6f, 0x77, 0x50, 0x6c, 0x61, 0x79, 0x69, 0x6e, 0x67, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e,
+	0x73, 0x65, 0x12, 0x1a, 0x0a, 0x08, 0x75, 0x73, 0x65, 0x72, 0x6e, 0x61, 0x6d, 0x65, 0x18, 0x01,
+	0x20, 0x01, 0x28, 0x09, 0x52, 0x08, 0x75, 0x73, 0x65, 0x72, 0x6e, 0x61, 0x6d, 0x65, 0x12, 0x12,
+	0x0a, 0x04, 0x67, 0x61, 0x6d, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x04, 0x67, 0x61,
+	0x6d, 0x65, 0x12, 0x2c, 0x0a, 0x0a, 0x73, 0x74, 0x61, 0x72, 0x74, 0x65, 0x64, 0x5f, 0x61, 0x74,
+	0x18, 0x03, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x0d, 0x2e, 0x6e, 0x65, 0x78, 0x74, 0x70, 0x65, 0x78,
+	0x2e, 0x54, 0x69, 0x6d, 0x65, 0x52, 0x09, 0x73, 0x74, 0x61, 0x72, 0x74, 0x65, 0x64, 0x41, 0x74,
+	0x22, 0x57, 0x0a, 0x15, 0x41, 0x6c, 0x6c, 0x4e, 0x6f, 0x77, 0x50, 0x6c, 0x61, 0x79, 0x69, 0x6e,
+	0x67, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x3e, 0x0a, 0x0c, 0x6e, 0x6f, 0x77,
+	0x5f, 0x70, 0x6c, 0x61, 0x79, 0x69, 0x6e, 0x67, 0x73, 0x18, 0x01, 0x20, 0x03, 0x28, 0x0b, 0x32,
+	0x1b, 0x2e, 0x6e, 0x65, 0x78, 0x74, 0x70, 0x65, 0x78, 0x2e, 0x4e, 0x6f, 0x77, 0x50, 0x6c, 0x61,
+	0x79, 0x69, 0x6e, 0x67, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x52, 0x0b, 0x6e, 0x6f,
+	0x77, 0x50, 0x6c, 0x61, 0x79, 0x69, 0x6e, 0x67, 0x73, 0x42, 0x21, 0x5a, 0x1f, 0x67, 0x69, 0x74,
+	0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x74, 0x69, 0x6e, 0x61, 0x78, 0x64, 0x2f, 0x6e,
+	0x65, 0x78, 0x74, 0x70, 0x65, 0x78, 0x2f, 0x74, 0x79, 0x70, 0x65, 0x73, 0x62, 0x06, 0x70, 0x72,
+	0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -378,24 +501,28 @@ func file_api_proto_rawDescGZIP() []byte {
 	return file_api_proto_rawDescData
 }
 
-var file_api_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
+var file_api_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
 var file_api_proto_goTypes = []interface{}{
-	(*Time)(nil),             // 0: nextpex.Time
-	(*LevelResponse)(nil),    // 1: nextpex.LevelResponse
-	(*AllLevelResponse)(nil), // 2: nextpex.AllLevelResponse
-	(*RankResponse)(nil),     // 3: nextpex.RankResponse
-	(*AllRankResponse)(nil),  // 4: nextpex.AllRankResponse
+	(*Time)(nil),                  // 0: nextpex.Time
+	(*LevelResponse)(nil),         // 1: nextpex.LevelResponse
+	(*AllLevelResponse)(nil),      // 2: nextpex.AllLevelResponse
+	(*RankResponse)(nil),          // 3: nextpex.RankResponse
+	(*AllRankResponse)(nil),       // 4: nextpex.AllRankResponse
+	(*NowPlayingResponse)(nil),    // 5: nextpex.NowPlayingResponse
+	(*AllNowPlayingResponse)(nil), // 6: nextpex.AllNowPlayingResponse
 }
 var file_api_proto_depIdxs = []int32{
 	0, // 0: nextpex.LevelResponse.time:type_name -> nextpex.Time
 	1, // 1: nextpex.AllLevelResponse.levels:type_name -> nextpex.LevelResponse
 	0, // 2: nextpex.RankResponse.time:type_name -> nextpex.Time
 	3, // 3: nextpex.AllRankResponse.ranks:type_name -> nextpex.RankResponse
-	4, // [4:4] is the sub-list for method output_type
-	4, // [4:4] is the sub-list for method input_type
-	4, // [4:4] is the sub-list for extension type_name
-	4, // [4:4] is the sub-list for extension extendee
-	0, // [0:4] is the sub-list for field type_name
+	0, // 4: nextpex.NowPlayingResponse.started_at:type_name -> nextpex.Time
+	5, // 5: nextpex.AllNowPlayingResponse.now_playings:type_name -> nextpex.NowPlayingResponse
+	6, // [6:6] is the sub-list for method output_type
+	6, // [6:6] is the sub-list for method input_type
+	6, // [6:6] is the sub-list for extension type_name
+	6, // [6:6] is the sub-list for extension extendee
+	0, // [0:6] is the sub-list for field type_name
 }
 
 func init() { file_api_proto_init() }
@@ -464,6 +591,30 @@ func file_api_proto_init() {
 				return nil
 			}
 		}
+		file_api_proto_msgTypes[5].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*NowPlayingResponse); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_api_proto_msgTypes[6].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*AllNowPlayingResponse); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -471,7 +622,7 @@ func file_api_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_api_proto_rawDesc,
 			NumEnums:      0,
-			NumMessages:   5,
+			NumMessages:   7,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

@@ -129,6 +129,34 @@ func getAllRanks(c echo.Context) error {
 	return c.JSON(200, buf)
 }
 
+func getNowPlaying(c echo.Context) error {
+	var nowPlaying []struct {
+		PendingPlay
+		Username string `db:"username"`
+	}
+	err := db.Select(&nowPlaying, "SELECT p.user_id,p.game_name,p.started_at,u.id FROM PendingPlay p INNER JOIN User u ON p.user_id=u.id")
+	if err != nil {
+		return err
+	}
+
+	ress := make([]*types.NowPlayingResponse, len(nowPlaying))
+	for i, np := range nowPlaying {
+		ress[i] = &types.NowPlayingResponse{
+			Game:      np.GameName,
+			StartedAt: makeTimePB(np.StartedAt),
+			Username:  np.Username,
+		}
+	}
+	response := &types.AllNowPlayingResponse{
+		NowPlayings: ress,
+	}
+	buf, err := proto.Marshal(response)
+	if err != nil {
+		return err
+	}
+	return c.JSON(200, buf)
+}
+
 func main() {
 	// Echo instance
 	e := echo.New()
@@ -146,6 +174,8 @@ func main() {
 
 	// Routes
 	e.GET("/level/all", getAllLevels)
+	e.GET("/rank/all", getAllRanks)
+	e.GET("/check/now", getNowPlaying)
 
 	// Start server
 	e.Logger.Fatal(e.Start(":1323"))
