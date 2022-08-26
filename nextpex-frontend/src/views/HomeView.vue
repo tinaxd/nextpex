@@ -11,6 +11,12 @@ import CheckCard from "../components/cards/CheckCard.vue";
       <div class="card" @click="onClickCard('rank')"><RankCard /></div>
       <div class="card" @click="onClickCard('check')"><CheckCard /></div>
     </div>
+    <div class="modal-container" v-if="showModal" @click="closeModal">
+      <div class="modal">
+        <p>This is a test</p>
+        <p>aaa</p>
+      </div>
+    </div>
   </main>
 </template>
 
@@ -19,9 +25,18 @@ import { defineComponent } from "vue";
 export default defineComponent({
   components: {},
   name: "HomeView",
+  data() {
+    return {
+      showModal: false,
+    };
+  },
   methods: {
     onClickCard(name: string) {
       console.log(name);
+      this.showModal = true;
+    },
+    closeModal() {
+      this.showModal = false;
     },
   },
 });
@@ -75,5 +90,22 @@ export default defineComponent({
   background-color: #dddddd;
   border-radius: 10px;
   cursor: pointer;
+}
+
+.modal-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  width: 100vw;
+  text-align: center;
+  /* pointer-events: none; */
+}
+
+.modal {
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: auto;
 }
 </style>
