@@ -6,15 +6,35 @@ import CheckCard from "../components/cards/CheckCard.vue";
 
 <template>
   <main>
-    <div class="dashboard">
-      <div class="card" @click="onClickCard('level')"><LevelCard /></div>
-      <div class="card" @click="onClickCard('rank')"><RankCard /></div>
-      <div class="card" @click="onClickCard('check')"><CheckCard /></div>
+    <div class="dashboard" @click="closeModal">
+      <div
+        class="card"
+        :class="{ clickable: !showModal() }"
+        @click.stop="onClickCard('level')"
+      >
+        <LevelCard />
+      </div>
+      <div
+        class="card"
+        :class="{ clickable: !showModal() }"
+        @click.stop="onClickCard('rank')"
+      >
+        <RankCard />
+      </div>
+      <div
+        class="card"
+        :class="{ clickable: !showModal() }"
+        @click.stop="onClickCard('check')"
+      >
+        <CheckCard />
+      </div>
     </div>
-    <div class="modal-container" v-if="showModal" @click="closeModal">
-      <div class="modal">
-        <p>This is a test</p>
-        <p>aaa</p>
+    <div class="fade-layer" v-show="showModal()"></div>
+    <div class="modal-container" v-if="showModal()">
+      <div class="modal" @click="modalClickPrevent">
+        <LevelCard v-if="modalType === 'level'" />
+        <RankCard v-else-if="modalType === 'rank'" />
+        <CheckCard v-else-if="modalType === 'check'" />
       </div>
     </div>
   </main>
@@ -27,16 +47,26 @@ export default defineComponent({
   name: "HomeView",
   data() {
     return {
-      showModal: false,
+      modalType: null as null | string,
     };
   },
   methods: {
     onClickCard(name: string) {
-      console.log(name);
-      this.showModal = true;
+      if (this.modalType !== null) {
+        this.modalType = null;
+        return;
+      }
+      // console.log(name);
+      this.modalType = name;
     },
     closeModal() {
-      this.showModal = false;
+      this.modalType = null;
+    },
+    showModal() {
+      return this.modalType !== null;
+    },
+    modalClickPrevent(e: Event) {
+      e.stopPropagation();
     },
   },
 });
@@ -47,6 +77,7 @@ export default defineComponent({
   width: 100vw;
   height: 100vh;
   display: grid;
+  z-index: 0;
 }
 
 /* 横幅広いとき */
@@ -89,17 +120,21 @@ export default defineComponent({
   margin: 20px;
   background-color: #dddddd;
   border-radius: 10px;
+}
+
+.clickable {
   cursor: pointer;
 }
 
 .modal-container {
   position: absolute;
-  top: 0;
-  left: 0;
-  height: 100vh;
-  width: 100vw;
+  top: 10vh;
+  left: 10vw;
+  height: 80vh;
+  width: 80vw;
   text-align: center;
-  /* pointer-events: none; */
+  pointer-events: none;
+  z-index: 2;
 }
 
 .modal {
@@ -107,5 +142,24 @@ export default defineComponent({
   left: 50%;
   transform: translate(-50%, -50%);
   pointer-events: auto;
+  background-color: #dddddd;
+  padding: 20px;
+  border-radius: 10px;
+  /* margin: 10px; */
+}
+
+.fade-layer {
+  position: absolute;
+  top: 0px;
+  left: 0px;
+
+  width: 100%;
+  height: 100%;
+
+  background-color: #000000;
+  opacity: 0.5;
+  z-index: 1;
+
+  pointer-events: none;
 }
 </style>
