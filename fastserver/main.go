@@ -2,6 +2,8 @@ package main
 
 import (
 	"database/sql"
+	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -71,13 +73,21 @@ func makeTimePB(t time.Time) *types.Time {
 	}
 }
 
+func sendProto(c echo.Context, msg proto.Message) error {
+	buf, err := proto.Marshal(msg)
+	if err != nil {
+		return err
+	}
+	return c.Blob(http.StatusOK, "application/octet-stream", buf)
+}
+
 func getAllLevels(c echo.Context) error {
 	var levels []struct {
 		Level    int       `db:"level"`
 		Time     time.Time `db:"time"`
 		Username string    `db:"username"`
 	}
-	err := db.Select(&levels, "SELECT t.new_level AS level,t.timeat AS time,u.username AS username FROM LevelUpdate t INNER JOIN User u ON t.user_id=u.id ORDER BY t.timeat DESC")
+	err := db.Select(&levels, `SELECT t.new_level AS level,t.timeat AS time,u.username AS username FROM LevelUpdate t INNER JOIN User u ON t.user_id=u.id ORDER BY t.timeat DESC`)
 	if err != nil {
 		return err
 	}
@@ -93,11 +103,7 @@ func getAllLevels(c echo.Context) error {
 	response := &types.AllLevelResponse{
 		Levels: ress,
 	}
-	buf, err := proto.Marshal(response)
-	if err != nil {
-		return err
-	}
-	return c.JSON(200, buf)
+	return sendProto(c, response)
 }
 
 func getAllRanks(c echo.Context) error {
@@ -106,7 +112,7 @@ func getAllRanks(c echo.Context) error {
 		Time     time.Time `db:"time"`
 		Username string    `db:"username"`
 	}
-	err := db.Select(&ranks, "SELECT t.new_rank AS rank,t.timeat AS time,u.username AS username FROM RankUpdate t INNER JOIN User u ON t.user_id=u.id ORDER BY t.timeat DESC")
+	err := db.Select(&ranks, `SELECT t.new_rank AS rank,t.timeat AS time,u.username AS username FROM RankUpdate t INNER JOIN User u ON t.user_id=u.id ORDER BY t.timeat DESC`)
 	if err != nil {
 		return err
 	}
@@ -122,11 +128,7 @@ func getAllRanks(c echo.Context) error {
 	response := &types.AllRankResponse{
 		Ranks: ress,
 	}
-	buf, err := proto.Marshal(response)
-	if err != nil {
-		return err
-	}
-	return c.JSON(200, buf)
+	return sendProto(c, response)
 }
 
 func getNowPlaying(c echo.Context) error {
@@ -134,7 +136,7 @@ func getNowPlaying(c echo.Context) error {
 		PendingPlay
 		Username string `db:"username"`
 	}
-	err := db.Select(&nowPlaying, "SELECT p.user_id,p.game_name,p.started_at,u.id FROM PendingPlay p INNER JOIN User u ON p.user_id=u.id")
+	err := db.Select(&nowPlaying, `SELECT p.user_id,p.game_name,p.started_at,u.id FROM PendingPlay p INNER JOIN User u ON p.user_id=u.id`)
 	if err != nil {
 		return err
 	}
@@ -150,11 +152,49 @@ func getNowPlaying(c echo.Context) error {
 	response := &types.AllNowPlayingResponse{
 		NowPlayings: ress,
 	}
-	buf, err := proto.Marshal(response)
+	return sendProto(c, response)
+}
+
+func getLatestGameSessions(c echo.Context) error {
+	type DBType struct {
+		PlayingTime
+		Username string `db:"username"`
+	}
+	var sessions []DBType
+
+	// limit
+	limit := 20
+	if l := c.QueryParam("limit"); l != "" {
+		var err error
+		limit, err = strconv.Atoi(l)
+		if err != nil {
+			return c.String(http.StatusBadRequest, "limit must be integer")
+		}
+	}
+
+	err := db.Select(&sessions, "SELECT pt.game_name,pt.started_at,pt.ended_at,u.username FROM PlayingTime pt INNER JOIN User u WHERE pt.user_id=u.id ORDER BY pt.ended_at DESC LIMIT ?", limit)
 	if err != nil {
 		return err
 	}
-	return c.JSON(200, buf)
+
+	ress := make([]*types.GameSession, len(sessions))
+	for i, s := range sessions {
+		ress[i] = &types.GameSession{
+			Game:      s.GameName.String,
+			StartedAt: makeTimePB(s.StartedAt),
+			EndedAt:   makeTimePB(s.EndedAt),
+			Username:  s.Username,
+		}
+	}
+
+	response := &types.LatestGameSessionResponse{
+		GameSessions: ress,
+	}
+	return sendProto(c, response)
+}
+
+func getMonthlyPlayingTime(c echo.Context) error {
+
 }
 
 func main() {
