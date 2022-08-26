@@ -7,17 +7,23 @@ import CheckCard from "../components/cards/CheckCard.vue";
 <template>
   <main>
     <div class="dashboard">
-      <div><LevelCard /></div>
-      <div><RankCard /></div>
-      <div><CheckCard /></div>
+      <div class="card" @click="onClickCard('level')"><LevelCard /></div>
+      <div class="card" @click="onClickCard('rank')"><RankCard /></div>
+      <div class="card" @click="onClickCard('check')"><CheckCard /></div>
     </div>
   </main>
 </template>
 
 <script lang="ts">
 import { defineComponent } from "vue";
-defineComponent({
+export default defineComponent({
   components: {},
+  name: "HomeView",
+  methods: {
+    onClickCard(name: string) {
+      console.log(name);
+    },
+  },
 });
 </script>
 
@@ -26,20 +32,48 @@ defineComponent({
   width: 100vw;
   height: 100vh;
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  grid-template-rows: 1fr 1fr;
 }
 
-.dashboard div {
+/* 横幅広いとき */
+@media (min-width: 600px) {
+  .dashboard {
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+  }
+
+  .dashboard div:nth-child(1) {
+    grid-area: 1 /1 /2/2;
+  }
+  .dashboard div:nth-child(2) {
+    grid-area: 1 /2 /2/3;
+  }
+  .dashboard div:nth-child(3) {
+    grid-area: 2/1/3/3;
+  }
+}
+
+/* 横幅狭いとき */
+@media (max-width: 600px) {
+  .dashboard {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr 1fr 1fr;
+  }
+
+  .dashboard div:nth-child(1) {
+    grid-area: 1 /1 /2/2;
+  }
+  .dashboard div:nth-child(2) {
+    grid-area: 2/1/3/2;
+  }
+  .dashboard div:nth-child(3) {
+    grid-area: 3/1/4/2;
+  }
+}
+
+.dashboard .card {
   margin: 20px;
-}
-.dashboard div:nth-child(1) {
-  grid-area: 1 /1 /2/2;
-}
-.dashboard div:nth-child(2) {
-  grid-area: 1 /2 /2/3;
-}
-.dashboard div:nth-child(3) {
-  grid-area: 2/1/3/3;
+  background-color: #dddddd;
+  border-radius: 10px;
+  cursor: pointer;
 }
 </style>

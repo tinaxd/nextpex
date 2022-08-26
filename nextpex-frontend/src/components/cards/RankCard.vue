@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import DashboardCard from "../DashboardCard.vue";
+import RankChart from "../charts/RankChart.vue";
 </script>
 
 <template>
-  <DashboardCard title="Rank"> aiueo </DashboardCard>
+  <DashboardCard title="Rank"> <RankChart /> </DashboardCard>
 </template>
 
 <script lang="ts"></script>

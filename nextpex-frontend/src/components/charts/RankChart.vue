@@ -10,7 +10,7 @@ import { Scatter } from "vue-chartjs";
 import { defineComponent } from "vue";
 import { registerables, Chart as ChartJS } from "chart.js";
 export default defineComponent({
-  name: "LevelChart",
+  name: "RankChart",
   components: {
     Scatter,
   },
