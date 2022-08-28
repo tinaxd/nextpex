@@ -94,4 +94,3 @@ db.sqlite3
 /uwsgi.ini
 /master.pid
 /static
-/data
