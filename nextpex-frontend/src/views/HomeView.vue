@@ -8,33 +8,36 @@ import CheckCard from "../components/cards/CheckCard.vue";
   <main>
     <div class="dashboard" @click="closeModal">
       <div
-        class="card"
+        class="card card-level"
         :class="{ clickable: !showModal() }"
         @click.stop="onClickCard('level')"
+        v-show="modalType !== 'level'"
       >
         <LevelCard />
       </div>
       <div
-        class="card"
+        class="card card-rank"
         :class="{ clickable: !showModal() }"
         @click.stop="onClickCard('rank')"
+        v-show="modalType !== 'rank'"
       >
         <RankCard />
       </div>
       <div
-        class="card"
+        class="card card-check"
         :class="{ clickable: !showModal() }"
         @click.stop="onClickCard('check')"
+        v-show="modalType !== 'check'"
       >
         <CheckCard />
       </div>
     </div>
     <div class="fade-layer" v-show="showModal()"></div>
     <div class="modal-container" v-if="showModal()">
-      <div class="modal" @click="modalClickPrevent">
-        <LevelCard v-if="modalType === 'level'" />
-        <RankCard v-else-if="modalType === 'rank'" />
-        <CheckCard v-else-if="modalType === 'check'" />
+      <div :class="cardClass" class="modal" @click="modalClickPrevent">
+        <LevelCard class="card-level" v-if="modalType === 'level'" />
+        <RankCard class="card-rank" v-else-if="modalType === 'rank'" />
+        <CheckCard class="card-check" v-else-if="modalType === 'check'" />
       </div>
     </div>
   </main>
@@ -67,6 +70,14 @@ export default defineComponent({
     },
     modalClickPrevent(e: Event) {
       e.stopPropagation();
+    },
+  },
+  computed: {
+    cardClass() {
+      if (this.modalType === null) {
+        return null;
+      }
+      return `card-${this.modalType}`;
     },
   },
 });
@@ -118,7 +129,7 @@ export default defineComponent({
 
 .dashboard .card {
   margin: 20px;
-  background-color: #dddddd;
+  /* background-color: #dddddd; */
   border-radius: 10px;
 }
 
@@ -161,5 +172,20 @@ export default defineComponent({
   z-index: 1;
 
   pointer-events: none;
+}
+
+.card-level {
+  --bg-color: #dff6ff;
+  background-color: var(--bg-color);
+}
+
+.card-rank {
+  --bg-color: #fdeedc;
+  background-color: var(--bg-color);
+}
+
+.card-check {
+  --bg-color: #fecd70;
+  background-color: var(--bg-color);
 }
 </style>
