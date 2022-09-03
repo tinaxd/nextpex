@@ -1,7 +1,6 @@
 package main
 
 import (
-	"database/sql"
 	"net/http"
 	"strconv"
 	"time"
@@ -18,49 +17,6 @@ import (
 var (
 	db *sqlx.DB
 )
-
-type LevelUpdate struct {
-	ID       int           `db:"id"`
-	UserID   int           `db:"user_id"`
-	OldLevel sql.NullInt32 `db:"old_level"`
-	NewLevel int           `db:"new_level"`
-	TimeAt   time.Time     `db:"timeat"`
-}
-
-type RankUpdate struct {
-	ID          int            `db:"id"`
-	UserID      int            `db:"user_id"`
-	OldRank     sql.NullInt32  `db:"old_rank"`
-	OldRankName sql.NullString `db:"old_rank_name"`
-	NewRank     int            `db:"new_rank"`
-	NewRankName string         `db:"new_rank_name"`
-	TimeAt      time.Time      `db:"timeat"`
-}
-
-type User struct {
-	ID          int    `db:"id"`
-	Username    string `db:"username"`
-	DisplayName string `db:"display_name"`
-}
-
-type InGameName struct {
-	UserID   int    `db:"user_id"`
-	GameName string `db:"game_name"`
-}
-
-type PlayingTime struct {
-	ID        int            `db:"id"`
-	UserID    int            `db:"user_id"`
-	GameName  sql.NullString `db:"game_name"`
-	StartedAt time.Time      `db:"started_at"`
-	EndedAt   time.Time      `db:"ended_at"`
-}
-
-type PendingPlay struct {
-	UserID    int       `db:"user_id"`
-	GameName  string    `db:"game_name"`
-	StartedAt time.Time `db:"started_at"`
-}
 
 func makeTimePB(t time.Time) *types.Time {
 	return &types.Time{
