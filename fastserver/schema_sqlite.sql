@@ -39,3 +39,14 @@ CREATE TABLE IF NOT EXISTS playingnow(
     gamename TEXT NOT NULL REFERENCES game(gamename) ON DELETE CASCADE,
     startedat INTEGER NOT NULL
 );
+
+CREATE VIEW monthlycheck AS
+select
+username,
+gamename,
+SUM(endedat-startedat) as playtime,
+strftime('%m', startedat, 'unixepoch') as month,
+strftime('%Y', startedat, 'unixepoch') as year
+from playingtime 
+group by username, gamename, month, year
+;

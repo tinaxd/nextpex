@@ -3,120 +3,95 @@ package main
 import (
 	"net/http"
 	"strconv"
-	"time"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
-	"github.com/tinaxd/nextpex/types"
-	"google.golang.org/protobuf/proto"
 
-	_ "github.com/lib/pq"
+	_ "github.com/mattn/go-sqlite3"
 )
 
 var (
 	db *sqlx.DB
 )
 
-func makeTimePB(t time.Time) *types.Time {
-	return &types.Time{
-		Hour:   int32(t.Hour()),
-		Minute: int32(t.Minute()),
-		Second: int32(t.Second()),
-		Date:   int32(t.Day()),
-		Month:  int32(t.Month()),
-		Year:   int32(t.Year()),
-	}
+type LevelResponse struct {
+	Level  int `json:"level"`
+	TimeAt int `json:"time"`
 }
 
-func sendProto(c echo.Context, msg proto.Message) error {
-	buf, err := proto.Marshal(msg)
-	if err != nil {
-		return err
-	}
-	return c.Blob(http.StatusOK, "application/octet-stream", buf)
+type AllLevelResponse struct {
+	Levels map[string][]LevelResponse `json:"levels"`
 }
 
 func getAllLevels(c echo.Context) error {
 	var levels []struct {
-		Level    int       `db:"level"`
-		Time     time.Time `db:"time"`
-		Username string    `db:"username"`
+		Level    int    `db:"newlevel"`
+		Time     int    `db:"timeat"`
+		Username string `db:"username"`
 	}
-	err := db.Select(&levels, `SELECT t.new_level AS level,t.timeat AS time,u.username AS username FROM LevelUpdate t INNER JOIN User u ON t.user_id=u.id ORDER BY t.timeat DESC`)
+	err := db.Select(&levels, `select username,newlevel,timeat from levelupdate order by timeat desc`)
 	if err != nil {
 		return err
 	}
 
-	ress := make([]*types.LevelResponse, len(levels))
-	for i, l := range levels {
-		ress[i] = &types.LevelResponse{
-			Level:    int32(l.Level),
-			Time:     makeTimePB(l.Time),
-			Username: l.Username,
-		}
+	levelMap := make(map[string][]LevelResponse)
+	for _, l := range levels {
+		levelMap[l.Username] = append(levelMap[l.Username], LevelResponse{
+			Level:  l.Level,
+			TimeAt: int(l.Time),
+		})
 	}
-	response := &types.AllLevelResponse{
-		Levels: ress,
-	}
-	return sendProto(c, response)
+
+	return c.JSON(http.StatusOK, levelMap)
+}
+
+type RankResponse struct {
+	Rank     int    `json:"rank"`
+	RankName string `json:"rank_name"`
+	TimeAt   int    `json:"time"`
+}
+
+type AllRankResponse struct {
+	Ranks map[string][]RankResponse `json:"ranks"`
 }
 
 func getAllRanks(c echo.Context) error {
 	var ranks []struct {
-		Rank     int       `db:"rank"`
-		Time     time.Time `db:"time"`
-		Username string    `db:"username"`
+		Rank     int    `db:"newrank"`
+		RankName string `db:"newrankname"`
+		Time     int    `db:"timeat"`
+		Username string `db:"username"`
 	}
-	err := db.Select(&ranks, `SELECT t.new_rank AS rank,t.timeat AS time,u.username AS username FROM RankUpdate t INNER JOIN User u ON t.user_id=u.id ORDER BY t.timeat DESC`)
+	err := db.Select(&ranks, `select username,newrank,newrankname,timeat from rankupdate order by timeat desc`)
 	if err != nil {
 		return err
 	}
 
-	ress := make([]*types.RankResponse, len(ranks))
-	for i, r := range ranks {
-		ress[i] = &types.RankResponse{
-			Rank:     int32(r.Rank),
-			Time:     makeTimePB(r.Time),
-			Username: r.Username,
-		}
+	rankMap := make(map[string][]RankResponse)
+	for _, r := range ranks {
+		rankMap[r.Username] = append(rankMap[r.Username], RankResponse{
+			Rank:     r.Rank,
+			RankName: r.RankName,
+			TimeAt:   r.Time,
+		})
 	}
-	response := &types.AllRankResponse{
-		Ranks: ress,
-	}
-	return sendProto(c, response)
+
+	return c.JSON(http.StatusOK, rankMap)
 }
 
 func getNowPlaying(c echo.Context) error {
-	var nowPlaying []struct {
-		PendingPlay
-		Username string `db:"username"`
-	}
-	err := db.Select(&nowPlaying, `SELECT p.user_id,p.game_name,p.started_at,u.id FROM PendingPlay p INNER JOIN User u ON p.user_id=u.id`)
+	var nowPlaying []PlayingNow
+	err := db.Select(&nowPlaying, `select username,gamename,startedat from playingnow`)
 	if err != nil {
 		return err
 	}
 
-	ress := make([]*types.NowPlayingResponse, len(nowPlaying))
-	for i, np := range nowPlaying {
-		ress[i] = &types.NowPlayingResponse{
-			Game:      np.GameName,
-			StartedAt: makeTimePB(np.StartedAt),
-			Username:  np.Username,
-		}
-	}
-	response := &types.AllNowPlayingResponse{
-		NowPlayings: ress,
-	}
-	return sendProto(c, response)
+	return c.JSON(http.StatusOK, nowPlaying)
 }
 
 func getLatestGameSessions(c echo.Context) error {
-	type DBType struct {
-		PlayingTime
-		Username string `db:"username"`
-	}
-	var sessions []DBType
+	var sessions []PlayingTime
 
 	// limit
 	limit := 20
@@ -128,29 +103,22 @@ func getLatestGameSessions(c echo.Context) error {
 		}
 	}
 
-	err := db.Select(&sessions, "SELECT pt.game_name,pt.started_at,pt.ended_at,u.username FROM PlayingTime pt INNER JOIN User u WHERE pt.user_id=u.id ORDER BY pt.ended_at DESC LIMIT ?", limit)
+	err := db.Select(&sessions, "select username,gamename,startedat,endedat from playingtime order by endedat limit ?", limit)
 	if err != nil {
 		return err
 	}
 
-	ress := make([]*types.GameSession, len(sessions))
-	for i, s := range sessions {
-		ress[i] = &types.GameSession{
-			Game:      s.GameName.String,
-			StartedAt: makeTimePB(s.StartedAt),
-			EndedAt:   makeTimePB(s.EndedAt),
-			Username:  s.Username,
-		}
-	}
-
-	response := &types.LatestGameSessionResponse{
-		GameSessions: ress,
-	}
-	return sendProto(c, response)
+	return c.JSON(http.StatusOK, sessions)
 }
 
 func getMonthlyPlayingTime(c echo.Context) error {
+	var monthlyChecks []MonthlyCheck
+	err := db.Select(&monthlyChecks, `select * from monthlycheck`)
+	if err != nil {
+		return err
+	}
 
+	return c.JSON(http.StatusOK, monthlyChecks)
 }
 
 func main() {
@@ -159,7 +127,7 @@ func main() {
 
 	// Initialize DB
 	var err error
-	db, err = sqlx.Connect("postgres", "user=nextpex password=nextpex dbname=nextpex sslmode=disable")
+	db, err = sqlx.Connect("sqlite3", "./db.sqlite3")
 	if err != nil {
 		panic(err)
 	}
@@ -172,6 +140,8 @@ func main() {
 	e.GET("/level/all", getAllLevels)
 	e.GET("/rank/all", getAllRanks)
 	e.GET("/check/now", getNowPlaying)
+	e.GET("/check/history", getLatestGameSessions)
+	e.GET("/check/monthly", getMonthlyPlayingTime)
 
 	// Start server
 	e.Logger.Fatal(e.Start(":1323"))

@@ -32,14 +32,22 @@ type RankUpdate struct {
 }
 
 type PlayingTime struct {
-	Username  string `db:"username"`
-	GameName  string `db:"gamename"`
-	StartedAt int    `db:"startedat"`
-	EndedAt   int    `db:"endedat"`
+	Username  string `db:"username" json:"username"`
+	GameName  string `db:"gamename" json:"gamename"`
+	StartedAt int    `db:"startedat" json:"started_at"`
+	EndedAt   int    `db:"endedat" json:"ended_at"`
 }
 
 type PlayingNow struct {
-	Username  string `db:"username"`
-	GameName  string `db:"gamename"`
-	StartedAt int    `db:"startedat"`
+	Username  string `db:"username" json:"username"`
+	GameName  string `db:"gamename" json:"gamename"`
+	StartedAt int    `db:"startedat" json:"started_at"`
+}
+
+type MonthlyCheck struct {
+	Username string `db:"username" json:"username"`
+	GameName string `db:"gamename" json:"gamename"`
+	Month    int    `db:"month" json:"month"`
+	Year     int    `db:"year" json:"year"`
+	Playtime int    `db:"playtime" json:"playtime"` // in seconds
 }
