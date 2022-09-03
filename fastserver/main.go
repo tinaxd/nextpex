@@ -82,7 +82,7 @@ func getAllRanks(c echo.Context) error {
 
 func getNowPlaying(c echo.Context) error {
 	var nowPlaying []PlayingNow
-	err := db.Select(&nowPlaying, `select username,gamename,startedat from playingnow`)
+	err := db.Select(&nowPlaying, `select username,gamename,startedat from playingnow order by startedat desc`)
 	if err != nil {
 		return err
 	}
@@ -103,7 +103,7 @@ func getLatestGameSessions(c echo.Context) error {
 		}
 	}
 
-	err := db.Select(&sessions, "select username,gamename,startedat,endedat from playingtime order by endedat limit ?", limit)
+	err := db.Select(&sessions, "select username,gamename,startedat,endedat from playingtime order by endedat desc limit ?", limit)
 	if err != nil {
 		return err
 	}
@@ -131,6 +131,8 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+
+	e.Use(middleware.CORS())
 
 	// Middleware
 	e.Use(middleware.Logger())

@@ -3,6 +3,7 @@ import { defineComponent } from "vue";
 import type { PlayHistoryEntry, PlayingEntry } from "../models";
 import PlayingNow from "./PlayingNow.vue";
 import PlayHistory from "./PlayHistory.vue";
+import axios from "axios";
 </script>
 
 <template>
@@ -20,6 +21,20 @@ export default defineComponent({
       historyEntries: [] as PlayHistoryEntry[],
       nowPlayings: [] as PlayingEntry[],
     };
+  },
+  mounted() {
+    this.fetchHistoryEntries();
+    this.fetchNowPlayings();
+  },
+  methods: {
+    async fetchHistoryEntries() {
+      const response = await axios.get("/check/history?limit=20");
+      this.historyEntries = response.data ?? [];
+    },
+    async fetchNowPlayings() {
+      const response = await axios.get("/check/now");
+      this.nowPlayings = response.data ?? [];
+    },
   },
 });
 </script>

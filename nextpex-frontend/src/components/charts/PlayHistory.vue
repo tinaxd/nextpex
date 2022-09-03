@@ -8,21 +8,23 @@ defineProps<{
 </script>
 
 <template>
-  <div>
+  <div class="wrapper">
     <table v-if="historyEntires.length > 0">
       <thead>
         <tr>
           <th>Username</th>
           <th>Game</th>
-          <th>Time</th>
+          <th>時刻</th>
+          <th>プレイ時間</th>
         </tr>
       </thead>
       <tbody>
         <!-- eslint-disable-next-line vue/require-v-for-key -->
         <tr v-for="history in historyEntires">
           <td>{{ history.username }}</td>
-          <td>{{ history.game }}</td>
-          <td>{{ formatTime(history.startTime, history.endTime) }}</td>
+          <td>{{ history.gamename }}</td>
+          <td>{{ formatTime(history.started_at, history.ended_at) }}</td>
+          <td>{{ formatDuration(history.started_at, history.ended_at) }}</td>
         </tr>
       </tbody>
     </table>
@@ -34,11 +36,34 @@ defineProps<{
 export default defineComponent({
   name: "PlayHistory",
   methods: {
-    formatTime(start: Date, end: Date): string {
-      const s = start.toLocaleString("ja-JP");
-      const e = end.toLocaleString("ja-JP");
+    formatTimeSingle(t: number): string {
+      const d = new Date(t * 1000);
+      // format in MM/DD HH:mm
+      return `${d.getMonth() + 1}/${d.getDate()} ${d
+        .getHours()
+        .toString()
+        .padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
+    },
+    formatTime(start: number, end: number): string {
+      const s = this.formatTimeSingle(start);
+      const e = this.formatTimeSingle(end);
       return `${s} - ${e}`;
+    },
+    formatDuration(start: number, end: number): string {
+      const minutes = Math.floor((end - start) / 60);
+      return `${minutes} 分`;
     },
   },
 });
 </script>
+
+<style scoped>
+th {
+  font-weight: bold;
+}
+
+.table {
+  height: inherit;
+  /* overflow-y: auto; */
+}
+</style>

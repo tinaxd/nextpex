@@ -14,17 +14,17 @@ defineProps<{
         <tr>
           <th>Username</th>
           <th>Game</th>
-          <th>Start</th>
-          <th>Duration</th>
+          <th>開始時刻</th>
+          <th>プレイ時間</th>
         </tr>
       </thead>
       <tbody>
         <!-- eslint-disable-next-line vue/require-v-for-key -->
         <tr v-for="nowPlaying in nowPlayings">
           <td>{{ nowPlaying.username }}</td>
-          <td>{{ nowPlaying.game }}</td>
-          <td>{{ formatTime(nowPlaying.startTime) }}</td>
-          <td>{{ formatDuration(nowPlaying.playingTime) }}</td>
+          <td>{{ nowPlaying.gamename }}</td>
+          <td>{{ formatTime(nowPlaying.started_at) }}</td>
+          <td>{{ formatDuration(nowPlaying.started_at) }}</td>
         </tr>
       </tbody>
     </table>
@@ -36,14 +36,20 @@ defineProps<{
 export default defineComponent({
   name: "PlayingNow",
   methods: {
-    formatTime(time: Date): string {
-      return time.toLocaleString("ja-JP");
+    formatTime(time: number): string {
+      return new Date(time * 1000).toLocaleString("ja-JP");
     },
-    formatDuration(millis: number): string {
-      let minutes = Math.floor(millis / 60000);
-      minutes = Math.floor(minutes);
+    formatDuration(time: number): string {
+      const millis = Date.now() - time * 1000;
+      const minutes = Math.floor(millis / (1000 * 60));
       return `${minutes} 分`;
     },
   },
 });
 </script>
+
+<style scoped>
+th {
+  font-weight: bold;
+}
+</style>

@@ -1,13 +1,13 @@
 export type PlayHistoryEntry = {
   username: string;
-  game: string;
-  startTime: Date;
-  endTime: Date;
+  gamename: string;
+  started_at: number;
+  ended_at: number;
 };
 
 export type PlayingEntry = {
   username: string;
-  game: string;
-  startTime: Date;
-  playingTime: number; // in milliseconds
+  gamename: string;
+  started_at: number;
+  // playingTime: number; // in milliseconds
 };

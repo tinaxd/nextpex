@@ -187,5 +187,6 @@ export default defineComponent({
 .card-check {
   --bg-color: #fecd70;
   background-color: var(--bg-color);
+  overflow-y: hidden;
 }
 </style>
