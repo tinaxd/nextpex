@@ -68,7 +68,7 @@ async def _apex_role_change(member: discord.Member, on: bool) -> None:
 
 
 def _oneapex_apexability(name: str, is_start: bool, game_name: str, time: datetime) -> None:
-    result = requests.post(WEB_API + "/register/check", json={
+    result = requests.post(WEB_API + "/check", json={
         "in_game_name": name,
         "type": "start" if is_start else "stop",
         # in unix time
