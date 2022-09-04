@@ -143,7 +143,7 @@ export default defineComponent({
   left: 10vw;
   height: 80vh;
   width: 80vw;
-  text-align: center;
+  /* text-align: center; */
   pointer-events: none;
   z-index: 2;
 }
