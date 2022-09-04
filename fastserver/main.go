@@ -127,6 +127,83 @@ func getMonthlyPlayingTime(c echo.Context) error {
 	return c.JSON(http.StatusOK, monthlyChecks)
 }
 
+func getUsernameFromInGameName(inGameName string) (string, bool) {
+	var username string
+	err := db.Get(&username, `select username from ingamename where ingamename=?`, inGameName)
+	if err != nil {
+		return "", false
+	}
+
+	return username, true
+}
+
+type insertRequest struct {
+	InGameName string `json:"in_game_name"`
+	Type       string `json:"type"`
+	Time       int    `json:"time"`
+	GameName   string `json:"game_name"`
+}
+
+func insertCheck(c echo.Context) error {
+	var req insertRequest
+	if err := c.Bind(&req); err != nil {
+		return err
+	}
+
+	// get username associated with in-game name
+	username, ok := getUsernameFromInGameName(req.InGameName)
+	if !ok {
+		return c.String(http.StatusNotFound, "in-game name not found")
+	}
+
+	if req.Type == "start" {
+		// insert into playingnow table
+		// if an entry already exists, update the startedat field
+		_, err := db.Exec(`insert into playingnow (username,gamename,startedat) values (?,?,?) ON CONFLICT(username) DO UPDATE SET gamename=?, startedat=?`, username, req.GameName, req.Time, req.GameName, req.Time)
+		if err != nil {
+			return err
+		}
+
+		return c.NoContent(http.StatusOK)
+	} else if req.Type == "stop" {
+		tx, err := db.Begin()
+		if err != nil {
+			return err
+		}
+		defer tx.Rollback()
+
+		// retrieve start info from playingnow table
+		var startInfo PlayingNow
+		if err := tx.QueryRow(`select * from playingnow where username=?`, username).Scan(&startInfo); err != nil {
+			return c.String(http.StatusNotFound, "start entry not found")
+		}
+
+		// if game names do not match, reject the request
+		if startInfo.GameName != req.GameName {
+			return c.String(http.StatusBadRequest, "game name does not match with start info")
+		}
+
+		// delete from playingnow table
+		if _, err := tx.Exec(`delete from playingnow where username=?`, username); err != nil {
+			return err
+		}
+
+		// insert into playingtime table
+		_, err = tx.Exec(`insert into playingtime (username,gamename,startedat,endedat) values (?,?,?,?)`, username, req.GameName, startInfo.StartedAt, req.Time)
+		if err != nil {
+			return err
+		}
+
+		if err := tx.Commit(); err != nil {
+			return err
+		}
+
+		return c.NoContent(http.StatusOK)
+	}
+
+	return c.String(http.StatusBadRequest, "type must be 'start' or 'stop'")
+}
+
 func main() {
 	// Echo instance
 	e := echo.New()

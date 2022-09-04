@@ -71,7 +71,8 @@ def _oneapex_apexability(name: str, is_start: bool, game_name: str, time: dateti
     result = requests.post(WEB_API + "/register/check", json={
         "in_game_name": name,
         "type": "start" if is_start else "stop",
-        "time": time.isoformat(),
+        # in unix time
+        "time": int(time.timestamp()),
         "game_name": game_name
     })
     if result.status_code != 200:
@@ -85,7 +86,7 @@ async def _send_apex_notification(member: discord.Member, game: str, is_start: b
     if chan:
         if is_start:
             tail = 'を始めました！'
-        else:
+        else: 
             tail = 'をやめました！'
         content = f'{member.display_name} が {game} {tail}'
         await chan.send(content=content)
