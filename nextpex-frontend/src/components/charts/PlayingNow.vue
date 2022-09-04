@@ -29,7 +29,7 @@ defineProps<{
         </tr>
       </tbody>
     </table>
-    <NoData title="Playing now" v-else />
+    <NoData v-else />
   </div>
 </template>
 

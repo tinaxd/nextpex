@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { defineComponent, defineProps } from "vue";
 defineProps<{
-  title: string;
+  title?: string;
 }>();
 </script>
 
 <template>
   <div class="center">
-    <p class="title" v-if="title !== ''">{{ title }}</p>
+    <p class="title" v-if="title">{{ title }}</p>
     <p>No data</p>
   </div>
 </template>

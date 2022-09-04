@@ -48,5 +48,6 @@ export default defineComponent({
 
 .check-info-table {
   flex: 1;
+  height: 100%;
 }
 </style>

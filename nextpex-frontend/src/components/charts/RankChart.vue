@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import { Scatter } from "vue-chartjs";
+defineProps<{
+  rankType: "trio" | "arena";
+}>();
 </script>
 
 <template>
-  <Scatter :chart-data="chartInput" :chart-options="chartOptions" />
+  <Scatter :chart-data="chartInput" :chart-options="(chartOptions as any)" />
 </template>
 
 <script lang="ts">
@@ -29,6 +32,11 @@ export default defineComponent({
   mounted() {
     ChartJS.register(...registerables);
     this.fetchRanks();
+  },
+  watch: {
+    rankType() {
+      this.fetchRanks();
+    },
   },
   computed: {
     chartInput() {
@@ -97,7 +105,7 @@ export default defineComponent({
   },
   methods: {
     async fetchRanks() {
-      const response = await axios.get("/rank/all");
+      const response = await axios.get(`/rank/${this.rankType}/all`);
       const ranks = response.data as {
         [key: string]: { rank: number; time: number; rank_name: string }[];
       };

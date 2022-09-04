@@ -57,13 +57,19 @@ type AllRankResponse struct {
 }
 
 func getAllRanks(c echo.Context) error {
+	rankType := c.Param("ranktype")
+
+	if rankType != "trio" && rankType != "arena" {
+		return c.String(http.StatusBadRequest, "ranktype must be 'trio' or 'arena'")
+	}
+
 	var ranks []struct {
 		Rank     int    `db:"newrank"`
 		RankName string `db:"newrankname"`
 		Time     int    `db:"timeat"`
 		Username string `db:"username"`
 	}
-	err := db.Select(&ranks, `select username,newrank,newrankname,timeat from rankupdate order by timeat desc`)
+	err := db.Select(&ranks, `select username,newrank,newrankname,timeat from rankupdate where ranktype=? order by timeat desc`, rankType)
 	if err != nil {
 		return err
 	}
@@ -140,7 +146,7 @@ func main() {
 
 	// Routes
 	e.GET("/level/all", getAllLevels)
-	e.GET("/rank/all", getAllRanks)
+	e.GET("/rank/:ranktype/all", getAllRanks)
 	e.GET("/check/now", getNowPlaying)
 	e.GET("/check/history", getLatestGameSessions)
 	e.GET("/check/monthly", getMonthlyPlayingTime)

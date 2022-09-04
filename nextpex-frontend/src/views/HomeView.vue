@@ -59,7 +59,7 @@ export default defineComponent({
         this.modalType = null;
         return;
       }
-      // console.log(name);
+      console.log("clicked card: " + name);
       this.modalType = name;
     },
     closeModal() {
