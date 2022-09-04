@@ -28,6 +28,7 @@ type RankUpdate struct {
 	NewRank     int            `db:"newrank"`
 	OldRankName sql.NullString `db:"oldrankname"`
 	NewRankName string         `db:"newrankname"`
+	RankType    string         `db:"ranktype"`
 	TimeAt      int            `db:"timeat"`
 }
 

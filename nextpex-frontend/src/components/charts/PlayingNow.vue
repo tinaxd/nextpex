@@ -9,6 +9,7 @@ defineProps<{
 
 <template>
   <div>
+    <h3>現在プレイ中</h3>
     <table v-if="nowPlayings.length > 0">
       <thead>
         <tr>
