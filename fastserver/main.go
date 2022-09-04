@@ -204,6 +204,67 @@ func insertCheck(c echo.Context) error {
 	return c.String(http.StatusBadRequest, "type must be 'start' or 'stop'")
 }
 
+type insertLevelRequest struct {
+	InGameName string `json:"in_game_name"`
+	OldLevel   int    `json:"old_level"`
+	NewLevel   int    `json:"new_level"`
+	Time       int    `json:"time"`
+}
+
+func insertLevelUpdate(c echo.Context) error {
+	// bind insertLevelRequest
+	var req insertLevelRequest
+	if err := c.Bind(&req); err != nil {
+		return err
+	}
+
+	// get username associated with in-game name
+	username, ok := getUsernameFromInGameName(req.InGameName)
+	if !ok {
+		return c.String(http.StatusNotFound, "in-game name not found")
+	}
+
+	// insert into levelupdate table
+	_, err := db.Exec(`insert into levelupdate (username,oldlevel,newlevel,timeat) values (?,?,?,?)`, username, req.OldLevel, req.NewLevel, req.Time)
+	if err != nil {
+		return err
+	}
+
+	return c.NoContent(http.StatusOK)
+}
+
+type insertRankRequest struct {
+	InGameName  string `json:"in_game_name"`
+	OldRank     int    `json:"old_rank"`
+	OldRankName string `json:"old_rank_name"`
+	NewRank     int    `json:"new_rank"`
+	NewRankName string `json:"new_rank_name"`
+	Time        int    `json:"time"`
+	RankType    string `json:"rank_type"`
+}
+
+func insertRankUpdate(c echo.Context) error {
+	// bind insertRankRequest
+	var req insertRankRequest
+	if err := c.Bind(&req); err != nil {
+		return err
+	}
+
+	// get username associated with in-game name
+	username, ok := getUsernameFromInGameName(req.InGameName)
+	if !ok {
+		return c.String(http.StatusNotFound, "in-game name not found")
+	}
+
+	// insert into rankupdate table
+	_, err := db.Exec(`insert into rankupdate (username,oldrank,oldrankname,newrank,newrankname,timeat,ranktype) values (?,?,?,?,?,?,?)`, username, req.OldRank, req.OldRankName, req.NewRank, req.NewRankName, req.Time, req.RankType)
+	if err != nil {
+		return err
+	}
+
+	return c.NoContent(http.StatusOK)
+}
+
 func main() {
 	// Echo instance
 	e := echo.New()
@@ -215,6 +276,7 @@ func main() {
 		panic(err)
 	}
 
+	// CORS settings
 	e.Use(middleware.CORS())
 
 	// Middleware
@@ -228,6 +290,10 @@ func main() {
 	e.GET("/check/history", getLatestGameSessions)
 	e.GET("/check/monthly", getMonthlyPlayingTime)
 
+	e.POST("/check", insertCheck)
+	e.POST("/level", insertLevelUpdate)
+	e.POST("/rank", insertRankUpdate)
+
 	// Start server
-	e.Logger.Fatal(e.Start(":1323"))
+	e.Logger.Fatal(e.Start(":2500"))
 }

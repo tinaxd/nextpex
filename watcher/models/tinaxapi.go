@@ -9,15 +9,15 @@ import (
 )
 
 type level struct {
-	PlayerName string `json:"player_name"`
-	Timestamp  int64  `json:"timestamp"`
-	OldLevel   int    `json:"old_rank"`
-	NewLevel   int    `json:"new_rank"`
+	PlayerName string `json:"in_game_name"`
+	Timestamp  int64  `json:"time"`
+	OldLevel   int    `json:"old_level"`
+	NewLevel   int    `json:"new_level"`
 }
 
 type rank struct {
-	PlayerName  string `json:"player_name"`
-	Timestamp   int64  `json:"timestamp"`
+	PlayerName  string `json:"in_game_name"`
+	Timestamp   int64  `json:"time"`
 	OldRank     int    `json:"old_rank"`
 	OldRankName string `json:"old_rank_name"`
 	NewRank     int    `json:"new_rank"`
@@ -33,7 +33,7 @@ func PostLevel(e *Environments, userID string, oldLevel, newLevel int) {
 		OldLevel:   oldLevel,
 		NewLevel:   newLevel,
 	})
-	res, err := http.Post(e.TINAX_API_ENDPOINT+"/api/compat/level/register", "application/json", bytes.NewBuffer(jsonData))
+	res, err := http.Post(e.TINAX_API_ENDPOINT+"/level", "application/json", bytes.NewBuffer(jsonData))
 	defer res.Body.Close()
 
 	if err != nil {
@@ -54,7 +54,7 @@ func PostRank(e *Environments, userID, rankType string, oldRank, newRank int) {
 		NewRankName: GetRankName(newRank, rankType),
 		RankType:    rankType,
 	})
-	res, err := http.Post(e.TINAX_API_ENDPOINT+"/api/compat/rank/register", "application/json", bytes.NewBuffer(jsonData))
+	res, err := http.Post(e.TINAX_API_ENDPOINT+"/rank", "application/json", bytes.NewBuffer(jsonData))
 	defer res.Body.Close()
 
 	if err != nil {
