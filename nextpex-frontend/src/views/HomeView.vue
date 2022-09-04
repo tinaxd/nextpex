@@ -21,7 +21,19 @@ import CheckCard from "../components/cards/CheckCard.vue";
         @click.stop="onClickCard('rank')"
         v-show="modalType !== 'rank'"
       >
-        <RankCard />
+        <RankCard :rank-type="rankType">
+          <div @click.stop>
+            <select v-model="rankType">
+              <option
+                v-for="s in rankSelectors"
+                :value="s.value"
+                :key="s.value"
+              >
+                {{ s.display }}
+              </option>
+            </select>
+          </div>
+        </RankCard>
       </div>
       <div
         class="card card-check"
@@ -36,7 +48,17 @@ import CheckCard from "../components/cards/CheckCard.vue";
     <div class="modal-container" v-if="showModal()">
       <div :class="cardClass" class="modal" @click="modalClickPrevent">
         <LevelCard class="card-level" v-if="modalType === 'level'" />
-        <RankCard class="card-rank" v-else-if="modalType === 'rank'" />
+        <RankCard
+          :rank-type="rankType"
+          class="card-rank"
+          v-else-if="modalType === 'rank'"
+        >
+          <select v-model="rankType">
+            <option v-for="s in rankSelectors" :value="s.value" :key="s.value">
+              {{ s.display }}
+            </option>
+          </select>
+        </RankCard>
         <CheckCard class="card-check" v-else-if="modalType === 'check'" />
       </div>
     </div>
@@ -51,6 +73,7 @@ export default defineComponent({
   data() {
     return {
       modalType: null as null | string,
+      rankType: "trio" as "trio" | "arena",
     };
   },
   methods: {
@@ -78,6 +101,18 @@ export default defineComponent({
         return null;
       }
       return `card-${this.modalType}`;
+    },
+    rankSelectors() {
+      return [
+        {
+          value: "trio",
+          display: "Trio",
+        },
+        {
+          value: "arena",
+          display: "Arena",
+        },
+      ];
     },
   },
 });
