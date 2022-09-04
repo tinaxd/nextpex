@@ -70,7 +70,7 @@ export default defineComponent({
             callbacks: {
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               label: (context: any) => {
-                const date = new Date(context.parsed.x);
+                const date = new Date(context.parsed.x * 1000);
                 const dateString = `${date.getUTCFullYear()}/${(
                   date.getUTCMonth() + 1
                 )
