@@ -7,7 +7,7 @@ import "element-plus/dist/index.css";
 import "./assets/main.css";
 import axios from "axios";
 
-axios.defaults.baseURL = "http://localhost:1323";
+axios.defaults.baseURL = "http://localhost:2500";
 
 const app = createApp(App);
 

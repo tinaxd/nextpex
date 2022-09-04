@@ -166,7 +166,7 @@ func insertCheck(c echo.Context) error {
 
 		return c.NoContent(http.StatusOK)
 	} else if req.Type == "stop" {
-		tx, err := db.Begin()
+		tx, err := db.Beginx()
 		if err != nil {
 			return err
 		}
@@ -174,7 +174,8 @@ func insertCheck(c echo.Context) error {
 
 		// retrieve start info from playingnow table
 		var startInfo PlayingNow
-		if err := tx.QueryRow(`select * from playingnow where username=?`, username).Scan(&startInfo); err != nil {
+		if err := tx.Get(&startInfo, `select * from playingnow where username=?`, username); err != nil {
+			c.Logger().Error(err)
 			return c.String(http.StatusNotFound, "start entry not found")
 		}
 
