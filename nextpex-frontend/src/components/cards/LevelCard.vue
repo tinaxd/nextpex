@@ -4,7 +4,9 @@ import LevelChart from "../charts/LevelChart.vue";
 </script>
 
 <template>
-  <DashboardCard title="Level"> <LevelChart /> </DashboardCard>
+  <DashboardCard title="Level">
+    <template v-slot:body><LevelChart /></template>
+  </DashboardCard>
 </template>
 
 <script lang="ts"></script>
