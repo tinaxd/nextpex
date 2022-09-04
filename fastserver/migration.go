@@ -63,7 +63,7 @@ func main() {
 
 	// Get all in-game names
 	var inGameNames []WebInGameName
-	db.Select(&inGameNames, "SELECT * FROM in_game_name")
+	db.Select(&inGameNames, "SELECT * FROM web_ingamename")
 
 	// show all players
 	playerMap := make(map[int]string)

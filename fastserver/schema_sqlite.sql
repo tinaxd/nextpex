@@ -3,8 +3,8 @@ CREATE TABLE IF NOT EXISTS user(
 );
 
 CREATE TABLE IF NOT EXISTS ingamename(
-    username TEXT PRIMARY KEY REFERENCES user(username) ON DELETE CASCADE,
-    ingamename TEXT NOT NULL
+    ingamename TEXT PRIMARY KEY,
+    username TEXT REFERENCES user(username) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS game(
