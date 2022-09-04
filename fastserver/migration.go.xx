@@ -38,6 +38,7 @@ type WebRankUpdate struct {
 	OldRankName string `db:"old_rank_name"`
 	NewRankName string `db:"new_rank_name"`
 	PlayerID    int    `db:"player_id"`
+	RankType    string `db:"rank_type"`
 	Time        int    `db:"time"`
 }
 
@@ -87,7 +88,7 @@ func main() {
 
 	// all ranks
 	var ranks []WebRankUpdate
-	db.Select(&ranks, "select id,old_rank,new_rank,old_rank_name,new_rank_name,player_id,strftime('%s', time) as time from web_rankupdate order by time asc;")
+	db.Select(&ranks, "select id,old_rank,new_rank,old_rank_name,new_rank_name,player_id,strftime('%s', time) as time,rank_type from web_rankupdate order by time asc;")
 	for _, rank := range ranks {
 		fmt.Println(rank)
 	}
@@ -145,7 +146,7 @@ func main() {
 	// add ranks
 	for _, rank := range ranks {
 		username := playerMap[rank.PlayerID]
-		_, err = tx.Exec("insert into rankupdate (username,oldrank,newrank,oldrankname,newrankname,timeat) values (?, ?, ?, ?, ?, ?)", username, rank.OldRank, rank.NewRank, rank.OldRankName, rank.NewRankName, rank.Time)
+		_, err = tx.Exec("insert into rankupdate (username,oldrank,newrank,oldrankname,newrankname,timeat,ranktype) values (?, ?, ?, ?, ?, ?,?)", username, rank.OldRank, rank.NewRank, rank.OldRankName, rank.NewRankName, rank.Time, rank.RankType)
 		if err != nil {
 			panic(err)
 		}

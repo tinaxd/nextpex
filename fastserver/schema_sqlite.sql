@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS rankupdate(
     oldrankname TEXT,
     newrank INTEGER NOT NULL,
     newrankname TEXT NOT NULL,
+    ranktype TEXT NOT NULL,
     timeat INTEGER NOT NULL
 );
 
