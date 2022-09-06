@@ -1,14 +1,16 @@
 import 'package:json_annotation/json_annotation.dart';
-import 'package:json_serializable/builder.dart';
 
 part 'api_types.g.dart';
 
 @JsonSerializable()
 class LevelResponse {
   final int level;
-  final int time;
+  @JsonKey(name: 'time')
+  final int unixtime;
 
-  LevelResponse({required this.level, required this.time});
+  DateTime get time => DateTime.fromMillisecondsSinceEpoch(unixtime * 1000);
+
+  LevelResponse({required this.level, required this.unixtime});
 
   factory LevelResponse.fromJson(Map<String, dynamic> json) =>
       _$LevelResponseFromJson(json);
@@ -18,7 +20,7 @@ class LevelResponse {
 
 @JsonSerializable()
 class AllLevelsResponse {
-  final Map<String, LevelResponse> levels;
+  final Map<String, List<LevelResponse>> levels;
 
   AllLevelsResponse({required this.levels});
 
@@ -33,10 +35,13 @@ class RankResponse {
   final int rank;
   @JsonKey(name: "rank_name")
   final String rankName;
-  final int time;
+  @JsonKey(name: 'time')
+  final int unixtime;
+
+  DateTime get time => DateTime.fromMillisecondsSinceEpoch(unixtime * 1000);
 
   RankResponse(
-      {required this.rank, required this.rankName, required this.time});
+      {required this.rank, required this.rankName, required this.unixtime});
 
   factory RankResponse.fromJson(Map<String, dynamic> json) =>
       _$RankResponseFromJson(json);
@@ -46,7 +51,7 @@ class RankResponse {
 
 @JsonSerializable()
 class AllRanksResponse {
-  final Map<String, RankResponse> ranks;
+  final Map<String, List<RankResponse>> ranks;
 
   AllRanksResponse({required this.ranks});
 
@@ -61,12 +66,15 @@ class PlayingNowEntry {
   final String username;
   final String gamename;
   @JsonKey(name: "started_at")
-  final int startedAt;
+  final int startedAtUnix;
+
+  DateTime get startedAt =>
+      DateTime.fromMillisecondsSinceEpoch(startedAtUnix * 1000);
 
   PlayingNowEntry(
       {required this.username,
       required this.gamename,
-      required this.startedAt});
+      required this.startedAtUnix});
 
   factory PlayingNowEntry.fromJson(Map<String, dynamic> json) =>
       _$PlayingNowEntryFromJson(json);
@@ -91,15 +99,21 @@ class PlayingTimeEntry {
   final String username;
   final String gamename;
   @JsonKey(name: "started_at")
-  final int startedAt;
+  final int startedAtUnix;
   @JsonKey(name: "ended_at")
-  final int endedAt;
+  final int endedAtUnix;
+
+  DateTime get startedAt =>
+      DateTime.fromMillisecondsSinceEpoch(startedAtUnix * 1000);
+
+  DateTime get endedAt =>
+      DateTime.fromMillisecondsSinceEpoch(endedAtUnix * 1000);
 
   PlayingTimeEntry(
       {required this.username,
       required this.gamename,
-      required this.startedAt,
-      required this.endedAt});
+      required this.startedAtUnix,
+      required this.endedAtUnix});
 
   factory PlayingTimeEntry.fromJson(Map<String, dynamic> json) =>
       _$PlayingTimeEntryFromJson(json);

@@ -43,7 +43,7 @@ func getAllLevels(c echo.Context) error {
 		})
 	}
 
-	return c.JSON(http.StatusOK, levelMap)
+	return c.JSON(http.StatusOK, AllLevelResponse{Levels: levelMap})
 }
 
 type RankResponse struct {
@@ -83,7 +83,7 @@ func getAllRanks(c echo.Context) error {
 		})
 	}
 
-	return c.JSON(http.StatusOK, rankMap)
+	return c.JSON(http.StatusOK, AllRankResponse{Ranks: rankMap})
 }
 
 func getNowPlaying(c echo.Context) error {

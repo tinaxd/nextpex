@@ -9,20 +9,23 @@ part of 'api_types.dart';
 LevelResponse _$LevelResponseFromJson(Map<String, dynamic> json) =>
     LevelResponse(
       level: json['level'] as int,
-      time: json['time'] as int,
+      unixtime: json['time'] as int,
     );
 
 Map<String, dynamic> _$LevelResponseToJson(LevelResponse instance) =>
     <String, dynamic>{
       'level': instance.level,
-      'time': instance.time,
+      'time': instance.unixtime,
     };
 
 AllLevelsResponse _$AllLevelsResponseFromJson(Map<String, dynamic> json) =>
     AllLevelsResponse(
       levels: (json['levels'] as Map<String, dynamic>).map(
-        (k, e) =>
-            MapEntry(k, LevelResponse.fromJson(e as Map<String, dynamic>)),
+        (k, e) => MapEntry(
+            k,
+            (e as List<dynamic>)
+                .map((e) => LevelResponse.fromJson(e as Map<String, dynamic>))
+                .toList()),
       ),
     );
 
@@ -34,20 +37,24 @@ Map<String, dynamic> _$AllLevelsResponseToJson(AllLevelsResponse instance) =>
 RankResponse _$RankResponseFromJson(Map<String, dynamic> json) => RankResponse(
       rank: json['rank'] as int,
       rankName: json['rank_name'] as String,
-      time: json['time'] as int,
+      unixtime: json['time'] as int,
     );
 
 Map<String, dynamic> _$RankResponseToJson(RankResponse instance) =>
     <String, dynamic>{
       'rank': instance.rank,
       'rank_name': instance.rankName,
-      'time': instance.time,
+      'time': instance.unixtime,
     };
 
 AllRanksResponse _$AllRanksResponseFromJson(Map<String, dynamic> json) =>
     AllRanksResponse(
       ranks: (json['ranks'] as Map<String, dynamic>).map(
-        (k, e) => MapEntry(k, RankResponse.fromJson(e as Map<String, dynamic>)),
+        (k, e) => MapEntry(
+            k,
+            (e as List<dynamic>)
+                .map((e) => RankResponse.fromJson(e as Map<String, dynamic>))
+                .toList()),
       ),
     );
 
@@ -60,14 +67,14 @@ PlayingNowEntry _$PlayingNowEntryFromJson(Map<String, dynamic> json) =>
     PlayingNowEntry(
       username: json['username'] as String,
       gamename: json['gamename'] as String,
-      startedAt: json['started_at'] as int,
+      startedAtUnix: json['started_at'] as int,
     );
 
 Map<String, dynamic> _$PlayingNowEntryToJson(PlayingNowEntry instance) =>
     <String, dynamic>{
       'username': instance.username,
       'gamename': instance.gamename,
-      'started_at': instance.startedAt,
+      'started_at': instance.startedAtUnix,
     };
 
 PlayingNowResponse _$PlayingNowResponseFromJson(Map<String, dynamic> json) =>
@@ -86,16 +93,16 @@ PlayingTimeEntry _$PlayingTimeEntryFromJson(Map<String, dynamic> json) =>
     PlayingTimeEntry(
       username: json['username'] as String,
       gamename: json['gamename'] as String,
-      startedAt: json['started_at'] as int,
-      endedAt: json['ended_at'] as int,
+      startedAtUnix: json['started_at'] as int,
+      endedAtUnix: json['ended_at'] as int,
     );
 
 Map<String, dynamic> _$PlayingTimeEntryToJson(PlayingTimeEntry instance) =>
     <String, dynamic>{
       'username': instance.username,
       'gamename': instance.gamename,
-      'started_at': instance.startedAt,
-      'ended_at': instance.endedAt,
+      'started_at': instance.startedAtUnix,
+      'ended_at': instance.endedAtUnix,
     };
 
 PlayingTimeResponse _$PlayingTimeResponseFromJson(Map<String, dynamic> json) =>
