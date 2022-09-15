@@ -1,3 +1,4 @@
+#[derive(Debug, Clone)]
 pub struct LevelUpdate {
     pub new_level: i32,
     pub time_at: i32,

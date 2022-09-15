@@ -3,14 +3,14 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
-struct LevelResponse {
-    level: i32,
-    time: i32,
+pub struct LevelResponse {
+    pub level: i32,
+    pub time: i32,
 }
 
 #[derive(Serialize, Deserialize)]
-struct AllLevelResponse {
-    levels: HashMap<String, LevelResponse>,
+pub struct AllLevelResponse {
+    pub levels: HashMap<String, LevelResponse>,
 }
 
 #[derive(Serialize, Deserialize)]
