@@ -25,23 +25,19 @@ impl From<rusqlite::Error> for DBError {
     }
 }
 
-fn conv_db_err(err: rusqlite::Error) -> DBError {
-    DBError::from(err)
+fn conv_db_err<T>(_err: T) -> error::Error {
+    error::ErrorInternalServerError("db error")
 }
 
 impl actix_web::error::ResponseError for DBError {}
 
 #[get("/level/all")]
 async fn get_all_levels(data: web::Data<AppState>) -> Result<Json<AllLevelResponse>> {
-    let db = data
-        .pool
-        .get()
-        .map_err(|_| error::ErrorInternalServerError("db error"))?;
+    let db = data.pool.get().map_err(conv_db_err)?;
 
     let mut stmt = db
         .prepare("select username,newlevel,timeat from levelupdate order by timeat desc")
-        .map_err(conv_db_err)
-        .unwrap();
+        .map_err(conv_db_err)?;
     let level_iter = stmt
         .query_map([], |row| {
             Ok(LevelUpdate {
@@ -52,10 +48,10 @@ async fn get_all_levels(data: web::Data<AppState>) -> Result<Json<AllLevelRespon
         })
         .unwrap();
 
-    let mut levelMap = std::collections::HashMap::<String, LevelResponse>::new();
+    let mut level_map = std::collections::HashMap::<String, LevelResponse>::new();
     for level in level_iter {
         let level = level.unwrap();
-        levelMap.insert(
+        level_map.insert(
             level.username.clone(),
             LevelResponse {
                 level: level.new_level,
@@ -63,7 +59,7 @@ async fn get_all_levels(data: web::Data<AppState>) -> Result<Json<AllLevelRespon
             },
         );
     }
-    Ok(web::Json(AllLevelResponse { levels: levelMap }))
+    Ok(web::Json(AllLevelResponse { levels: level_map }))
 }
 
 #[actix_web::main]
