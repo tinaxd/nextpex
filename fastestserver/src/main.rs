@@ -4,8 +4,8 @@ extern crate r2d2_sqlite;
 use actix_web::web::Json;
 use actix_web::{error, get, web, App, HttpServer, Result};
 use derive_more::{Display, Error};
-use fastestserver::db::LevelUpdate;
-use fastestserver::types::{AllLevelResponse, LevelResponse};
+use fastestserver::db::{LevelUpdate, PartialRankUpdate, RankUpdate};
+use fastestserver::types::{AllLevelResponse, AllRankResponse, LevelResponse, RankResponse};
 use r2d2_sqlite::SqliteConnectionManager;
 use rusqlite::Connection;
 
@@ -60,6 +60,39 @@ async fn get_all_levels(data: web::Data<AppState>) -> Result<Json<AllLevelRespon
         );
     }
     Ok(web::Json(AllLevelResponse { levels: level_map }))
+}
+
+#[get("/rank/all")]
+async fn get_all_ranks(data: web::Data<AppState>) -> Result<Json<AllRankResponse>> {
+    let db = data.pool.get().map_err(conv_db_err)?;
+
+    let mut stmt = db
+        .prepare("select username,newrank,newrankname,timeat from rankupdate order by timeat desc")
+        .map_err(conv_db_err)?;
+    let rank_iter = stmt
+        .query_map([], |row| {
+            Ok(PartialRankUpdate {
+                new_rank: row.get_unwrap(1),
+                new_rank_name: row.get_unwrap(2),
+                time_at: row.get_unwrap(3),
+                username: row.get_unwrap(0),
+            })
+        })
+        .unwrap();
+
+    let mut rank_map = std::collections::HashMap::<String, RankResponse>::new();
+    for rank in rank_iter {
+        let rank = rank.unwrap();
+        rank_map.insert(
+            rank.username.clone(),
+            RankResponse {
+                rank: rank.new_rank,
+                rank_name: rank.new_rank_name,
+                time: rank.time_at,
+            },
+        );
+    }
+    Ok(web::Json(AllRankResponse { ranks: rank_map }))
 }
 
 #[actix_web::main]
