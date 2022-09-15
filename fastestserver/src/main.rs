@@ -52,10 +52,10 @@ async fn get_all_levels(data: web::Data<AppState>) -> Result<Json<AllLevelRespon
         })
         .unwrap();
 
-    let mut levelMap = std::collections::HashMap::<String, LevelResponse>::new();
+    let mut level_map = std::collections::HashMap::<String, LevelResponse>::new();
     for level in level_iter {
         let level = level.unwrap();
-        levelMap.insert(
+        level_map.insert(
             level.username.clone(),
             LevelResponse {
                 level: level.new_level,
@@ -63,7 +63,7 @@ async fn get_all_levels(data: web::Data<AppState>) -> Result<Json<AllLevelRespon
             },
         );
     }
-    Ok(web::Json(AllLevelResponse { levels: levelMap }))
+    Ok(web::Json(AllLevelResponse { levels: level_map }))
 }
 
 #[actix_web::main]
@@ -76,7 +76,7 @@ async fn main() -> std::io::Result<()> {
             .app_data(web::Data::new(AppState { pool: pool.clone() }))
             .service(get_all_levels)
     })
-    .bind(("127.0.0.1", 8080))?
+    .bind(("127.0.0.1", 9000))?
     .run()
     .await
 }
