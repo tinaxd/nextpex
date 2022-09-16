@@ -16,6 +16,7 @@ use serenity::framework::StandardFramework;
 use serenity::model;
 use serenity::model::channel::Message;
 use serenity::model::gateway::Ready;
+use serenity::model::prelude::*;
 use serenity::model::prelude::{ActivityType, Emoji, GuildChannel, Presence};
 use serenity::prelude::*;
 
@@ -299,6 +300,66 @@ impl Handler {
         let m = m.get_mut();
         m.insert(guild_id, msg_id);
     }
+
+    async fn is_in_watching_msg(
+        &self,
+        guild_id: &serenity::model::id::GuildId,
+        msg_id: &serenity::model::id::MessageId,
+    ) -> bool {
+        let m = self.watching_msg.clone();
+        let m = m.lock().await;
+        let m = m.borrow();
+
+        match m.get(guild_id) {
+            None => false,
+            Some(waching_msg) => waching_msg == msg_id,
+        }
+    }
+
+    async fn reaction_handler(
+        &self,
+        ctx: &Context,
+        reaction: &Reaction,
+        added: bool,
+    ) -> Result<(), String> {
+        let guild_id = reaction.guild_id.ok_or("no guild")?;
+        let msg = reaction.message(ctx).await.map_err(|e| e.to_string())?;
+
+        if !self.is_in_watching_msg(&guild_id, &msg.id).await {
+            return Ok(());
+        }
+
+        let member = reaction
+            .member
+            .as_ref()
+            .ok_or("no member field".to_string())?;
+
+        match &member.nick {
+            None => {}
+            Some(nick) => {
+                if nick == "Apex Police" {
+                    return Ok(());
+                }
+            }
+        }
+
+        const APEX_GAME: &'static str = "Apex Legends";
+        let event = if added {
+            GameEvent::Start(APEX_GAME.to_string())
+        } else {
+            GameEvent::End(APEX_GAME.to_string())
+        };
+
+        let mut member = guild_id
+            .member(&ctx.http, member.user.as_ref().ok_or("no user id")?.id)
+            .await
+            .map_err(|e| e.to_string())?;
+        self.send_game_notification(&mut member, ctx, &event)
+            .await
+            .map_err(|e| e.to_string())?;
+
+        Ok(())
+    }
 }
 
 #[async_trait]
@@ -426,6 +487,18 @@ impl EventHandler for Handler {
                     }
                 },
             },
+        }
+    }
+
+    async fn reaction_add(&self, ctx: Context, add_reaction: Reaction) {
+        if let Err(e) = self.reaction_handler(&ctx, &add_reaction, true).await {
+            println!("reaction_add Error: {:?}", e);
+        }
+    }
+
+    async fn reaction_remove(&self, ctx: Context, removed_reaction: Reaction) {
+        if let Err(e) = self.reaction_handler(&ctx, &removed_reaction, false).await {
+            println!("reaction_add Error: {:?}", e);
         }
     }
 }
