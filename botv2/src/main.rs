@@ -2,17 +2,23 @@ extern crate redis;
 extern crate serenity;
 extern crate tokio;
 
+use std::cell::RefCell;
+use std::collections::HashMap;
 use std::env;
+use std::sync::Arc;
 
 use serenity::async_trait;
 use serenity::model::channel::Message;
 use serenity::model::gateway::Ready;
+use serenity::model::prelude::{Emoji, Guild, GuildChannel};
 use serenity::prelude::*;
 
 use redis::AsyncCommands;
 
 struct Handler {
     redis: redis::Client,
+    watching_msg:
+        Arc<Mutex<RefCell<HashMap<serenity::model::id::GuildId, serenity::model::id::MessageId>>>>,
 }
 
 type RedisResult<T> = std::result::Result<T, redis::RedisError>;
@@ -124,6 +130,39 @@ async fn redis_loop(mut conn: redis::aio::Connection, ctx: Context) {
     }
 }
 
+impl Handler {
+    async fn send_apexability_msg(&self, ctx: &Context, guild: &Guild) -> serenity::Result<()> {
+        let chan = find_channel(&ctx, guild, SELF_APEX_CHAN).await?;
+        if let Some(chan) = chan {
+            let content = "Apex Legends を始めたら :apex: リアクションをつけてください。やめたらリアクションを外してください。過去のメッセージにリアクションをつけても反応しません。Discord のステータスメッセージを公開している人はリアクションをつける必要はありません。";
+
+            let emoji = find_emoji(&ctx, guild, "apex").await?;
+            if let Some(emoji) = emoji {
+                let msg = chan.say(&ctx.http, content).await?;
+                self.set_watching_msg(guild.id, msg.id);
+                msg.react(&ctx.http, emoji).await?;
+                Ok(())
+            } else {
+                println!(":apex: emoji not found in {}", guild.name);
+                Ok(())
+            }
+        } else {
+            Ok(())
+        }
+    }
+
+    async fn set_watching_msg(
+        &self,
+        guild_id: serenity::model::id::GuildId,
+        msg_id: serenity::model::id::MessageId,
+    ) {
+        let m = self.watching_msg.clone();
+        let mut m = m.lock().await;
+        let m = m.get_mut();
+        m.insert(guild_id, msg_id);
+    }
+}
+
 #[async_trait]
 impl EventHandler for Handler {
     // Set a handler for the `message` event - so that whenever a new message
@@ -180,6 +219,36 @@ impl EventHandler for Handler {
     }
 }
 
+async fn find_channel(
+    ctx: &Context,
+    guild: &Guild,
+    chan_name: &str,
+) -> serenity::Result<Option<GuildChannel>> {
+    let channels = guild_id.channels(&ctx.http).await?;
+    for channel in channels.values() {
+        if channel.name == chan_name {
+            return Ok(Some(channel.clone()));
+        }
+    }
+    Ok(None)
+}
+
+const SELF_APEX_CHAN: &'static str = "self-apexability";
+
+async fn find_emoji(
+    ctx: &Context,
+    guild: &Guild,
+    emoji_name: &str,
+) -> serenity::Result<Option<Emoji>> {
+    let emojis = guild.emojis(&ctx.http).await?;
+    for emoji in emojis {
+        if emoji.name == emoji_name {
+            return Ok(Some(emoji));
+        }
+    }
+    Ok(None)
+}
+
 #[tokio::main]
 async fn main() {
     // Configure the client with your Discord bot token in the environment.
@@ -187,7 +256,10 @@ async fn main() {
     // Set gateway intents, which decides what events the bot will be notified about
     let intents = GatewayIntents::GUILD_MESSAGES
         | GatewayIntents::DIRECT_MESSAGES
-        | GatewayIntents::MESSAGE_CONTENT;
+        | GatewayIntents::MESSAGE_CONTENT
+        | GatewayIntents::GUILD_MEMBERS
+        | GatewayIntents::GUILD_MESSAGE_REACTIONS
+        | GatewayIntents::GUILD_PRESENCES;
 
     let r = redis::Client::open("redis://localhost:6379").expect("redis fail");
 
@@ -195,7 +267,10 @@ async fn main() {
     // automatically prepend your bot token with "Bot ", which is a requirement
     // by Discord for bot users.
     let mut client = Client::builder(&token, intents)
-        .event_handler(Handler { redis: r })
+        .event_handler(Handler {
+            redis: r,
+            watching_msg: Arc::new(Mutex::new(RefCell::new(Vec::new()))),
+        })
         .await
         .expect("Err creating client");
 
