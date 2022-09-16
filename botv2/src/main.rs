@@ -286,6 +286,13 @@ impl Handler {
                 Ok(())
             }
         } else {
+            println!(
+                "could not found {} in {}",
+                SELF_APEX_CHAN,
+                guild
+                    .name(&ctx.cache)
+                    .unwrap_or("<unknown guild>".to_string())
+            );
             Ok(())
         }
     }
