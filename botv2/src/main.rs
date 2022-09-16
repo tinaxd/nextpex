@@ -336,13 +336,13 @@ impl Handler {
             return Ok(());
         }
 
-        let member = reaction
-            .member
-            .as_ref()
-            .ok_or("no member field".to_string())?;
+        let mut member = guild_id
+            .member(&ctx.http, reaction.user_id.ok_or("no user id")?)
+            .await
+            .map_err(|e| e.to_string())?;
 
         match &member.nick {
-            None => {}
+            None => return Ok(()),
             Some(nick) => {
                 if nick == "Apex Police" {
                     return Ok(());
@@ -357,10 +357,6 @@ impl Handler {
             GameEvent::End(APEX_GAME.to_string())
         };
 
-        let mut member = guild_id
-            .member(&ctx.http, member.user.as_ref().ok_or("no user id")?.id)
-            .await
-            .map_err(|e| e.to_string())?;
         self.send_game_notification(&mut member, ctx, &event)
             .await
             .map_err(|e| e.to_string())?;
@@ -455,11 +451,9 @@ impl EventHandler for Handler {
         // send self-apexability msg
         let guilds = ready.guilds;
         for guild in guilds {
-            if !guild.unavailable {
-                let guild_id = guild.id;
-                if let Err(e) = self.send_apexability_msg(&ctx, &guild_id).await {
-                    println!("self apexability send Error: {:?}", e);
-                }
+            let guild_id = guild.id;
+            if let Err(e) = self.send_apexability_msg(&ctx, &guild_id).await {
+                println!("self apexability send Error: {:?}", e);
             }
         }
     }
@@ -505,7 +499,7 @@ impl EventHandler for Handler {
 
     async fn reaction_remove(&self, ctx: Context, removed_reaction: Reaction) {
         if let Err(e) = self.reaction_handler(&ctx, &removed_reaction, false).await {
-            println!("reaction_add Error: {:?}", e);
+            println!("reaction_remove Error: {:?}", e);
         }
     }
 }
