@@ -1,5 +1,7 @@
 extern crate redis;
 extern crate reqwest;
+extern crate serde;
+extern crate serde_json;
 extern crate serenity;
 extern crate tokio;
 
@@ -8,17 +10,19 @@ use std::collections::HashMap;
 use std::env;
 use std::sync::Arc;
 
+use chrono::TimeZone;
 use serenity::async_trait;
 use serenity::framework::StandardFramework;
 use serenity::model;
 use serenity::model::channel::Message;
 use serenity::model::gateway::Ready;
-use serenity::model::prelude::{Activity, ActivityType, Emoji, Guild, GuildChannel, Presence};
+use serenity::model::prelude::{ActivityType, Emoji, GuildChannel, Presence};
 use serenity::prelude::*;
 
 use redis::AsyncCommands;
 
 struct Handler {
+    web_api: String,
     redis: redis::Client,
     watching_msg:
         Arc<Mutex<RefCell<HashMap<serenity::model::id::GuildId, serenity::model::id::MessageId>>>>,
@@ -181,31 +185,83 @@ async fn apex_role_change(
     }
 }
 
-async fn send_game_notification(
-    member: &mut serenity::model::guild::Member,
-    ctx: &Context,
-    event: &GameEvent,
-) -> serenity::Result<()> {
-    let guild = &member.guild_id;
-    let chan = find_channel(ctx, guild, "self-apexability").await?;
-    if let Some(chan) = chan {
-        let (tail, game, on) = match event {
-            GameEvent::Start(game) => (format!("{} を始めました！", game), game, true),
-            GameEvent::End(game) => (format!("{} をやめました！", game), game, false),
-        };
-        let content = format!("{} が {}", member.display_name(), tail);
-        chan.say(&ctx.http, content).await?;
-
-        if game == "Apex Legends" {
-            apex_role_change(ctx, member, on).await?;
-        }
-        todo!("send to nextpex");
-    }
-
-    Ok(())
+#[derive(Debug, Clone, serde::Serialize)]
+struct NextpexCheckRequest {
+    in_game_name: String,
+    r#type: String,
+    time: i64,
+    game_name: String,
 }
 
 impl Handler {
+    async fn send_game_notification(
+        &self,
+        member: &mut serenity::model::guild::Member,
+        ctx: &Context,
+        event: &GameEvent,
+    ) -> serenity::Result<()> {
+        let guild = &member.guild_id;
+        let chan = find_channel(ctx, guild, "self-apexability").await?;
+        if let Some(chan) = chan {
+            let (tail, game, on) = match event {
+                GameEvent::Start(game) => (format!("{} を始めました！", game), game, true),
+                GameEvent::End(game) => (format!("{} をやめました！", game), game, false),
+            };
+            let content = format!("{} が {}", member.display_name(), tail);
+            chan.say(&ctx.http, content).await?;
+
+            if game == "Apex Legends" {
+                apex_role_change(ctx, member, on).await?;
+            }
+
+            let member_name = &member.display_name();
+            let is_start = on;
+            let game_name = game;
+            let time = chrono::Local::now();
+            self.nextpex_apexability(member_name, is_start, game_name, &time)
+                .await;
+        }
+
+        Ok(())
+    }
+
+    async fn nextpex_apexability<T: TimeZone>(
+        &self,
+        name: &str,
+        is_start: bool,
+        game_name: &str,
+        time: &chrono::DateTime<T>,
+    ) {
+        let url = format!("{}/check", &self.web_api);
+        let body = NextpexCheckRequest {
+            in_game_name: name.to_string(),
+            r#type: if is_start { "start" } else { "end" }.to_string(),
+            time: time.timestamp(),
+            game_name: game_name.to_string(),
+        };
+        let body = serde_json::to_string(&body);
+
+        match body {
+            Err(e) => println!("json serialize error: {:?}", e),
+            Ok(body) => {
+                let client = reqwest::Client::new();
+                let res = client.post(url).body(body).send().await;
+                match res {
+                    Err(e) => println!("nextpex api error: {:?}", e),
+                    Ok(res) => {
+                        if !res.status().is_success() {
+                            println!(
+                                "nextpex api 
+                            returned failure code: {:?}",
+                                res
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     async fn send_apexability_msg(
         &self,
         ctx: &Context,
@@ -323,7 +379,21 @@ impl EventHandler for Handler {
             .get_async_connection()
             .await
             .expect("failed to get redis connection");
-        tokio::spawn(async move { redis_loop(conn, ctx) });
+        {
+            let ctx = ctx.clone();
+            tokio::spawn(async move { redis_loop(conn, ctx) });
+        }
+
+        // send self-apexability msg
+        let guilds = ready.guilds;
+        for guild in guilds {
+            if !guild.unavailable {
+                let guild_id = guild.id;
+                if let Err(e) = self.send_apexability_msg(&ctx, &guild_id).await {
+                    println!("self apexability send Error: {:?}", e);
+                }
+            }
+        }
     }
 
     // async fn guild_member_update(&self, _ctx: Context, _new: GuildMemberUpdateEvent) {}
@@ -345,7 +415,7 @@ impl EventHandler for Handler {
                             Some(guild_id) => match guild_id.member(&ctx, user.id).await {
                                 Ok(mut member) => {
                                     if let Err(e) =
-                                        send_game_notification(&mut member, &ctx, &game).await
+                                        self.send_game_notification(&mut member, &ctx, &game).await
                                     {
                                         println!("Error: {:?}", e);
                                     }
@@ -535,8 +605,10 @@ async fn find_emoji(
 
 #[tokio::main]
 async fn main() {
+    let web_api = env::var("WEB_API").expect("WEB_API not set");
+
     // Configure the client with your Discord bot token in the environment.
-    let token = env::var("DISCORD_TOKEN").expect("Expected a token in the environment");
+    let token = env::var("DISCORD_TOKEN").expect("DISCORD_TOKEN not set");
     // Set gateway intents, which decides what events the bot will be notified about
     let intents = GatewayIntents::GUILD_MESSAGES
         | GatewayIntents::DIRECT_MESSAGES
@@ -552,6 +624,7 @@ async fn main() {
     // by Discord for bot users.
     let mut client = Client::builder(&token, intents)
         .event_handler(Handler {
+            web_api,
             redis: r,
             watching_msg: Arc::new(Mutex::new(RefCell::new(HashMap::new()))),
         })
