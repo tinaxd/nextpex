@@ -10,7 +10,7 @@ use std::sync::Arc;
 use serenity::async_trait;
 use serenity::model::channel::Message;
 use serenity::model::gateway::Ready;
-use serenity::model::prelude::{Emoji, Guild, GuildChannel};
+use serenity::model::prelude::{Emoji, Guild, GuildChannel, Presence};
 use serenity::prelude::*;
 
 use redis::AsyncCommands;
@@ -217,6 +217,12 @@ impl EventHandler for Handler {
             .expect("failed to get redis connection");
         tokio::spawn(async move { redis_loop(conn, ctx) });
     }
+
+    // async fn guild_member_update(&self, _ctx: Context, _new: GuildMemberUpdateEvent) {}
+
+    async fn presence_update(&self, _ctx: Context, _new_data: Presence) {
+        println!("presence_update: {:?}", _new_data);
+    }
 }
 
 async fn find_channel(
@@ -224,7 +230,7 @@ async fn find_channel(
     guild: &Guild,
     chan_name: &str,
 ) -> serenity::Result<Option<GuildChannel>> {
-    let channels = guild_id.channels(&ctx.http).await?;
+    let channels = guild.channels(&ctx.http).await?;
     for channel in channels.values() {
         if channel.name == chan_name {
             return Ok(Some(channel.clone()));
@@ -269,7 +275,7 @@ async fn main() {
     let mut client = Client::builder(&token, intents)
         .event_handler(Handler {
             redis: r,
-            watching_msg: Arc::new(Mutex::new(RefCell::new(Vec::new()))),
+            watching_msg: Arc::new(Mutex::new(RefCell::new(HashMap::new()))),
         })
         .await
         .expect("Err creating client");
