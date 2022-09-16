@@ -135,7 +135,7 @@ async fn main() -> std::io::Result<()> {
             .service(get_all_levels)
             .service(get_all_ranks)
     })
-    .bind(("127.0.0.1", 8080))?
+    .bind(("127.0.0.1", 9000))?
     .run()
     .await
 }
