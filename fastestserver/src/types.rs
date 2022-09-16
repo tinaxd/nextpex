@@ -10,7 +10,7 @@ pub struct LevelResponse {
 
 #[derive(Serialize, Deserialize)]
 pub struct AllLevelResponse {
-    pub levels: HashMap<String, LevelResponse>,
+    pub levels: HashMap<String, Vec<LevelResponse>>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -22,7 +22,7 @@ pub struct RankResponse {
 
 #[derive(Serialize, Deserialize)]
 pub struct AllRankResponse {
-    pub ranks: HashMap<String, RankResponse>,
+    pub ranks: HashMap<String, Vec<RankResponse>>,
 }
 
 #[derive(Serialize, Deserialize)]
