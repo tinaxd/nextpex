@@ -14,40 +14,40 @@ pub struct AllLevelResponse {
 }
 
 #[derive(Serialize, Deserialize)]
-struct RankResponse {
-    rank: i32,
-    rank_name: String,
-    time: i32,
+pub struct RankResponse {
+    pub rank: i32,
+    pub rank_name: String,
+    pub time: i32,
 }
 
 #[derive(Serialize, Deserialize)]
-struct AllRankResponse {
-    ranks: HashMap<String, RankResponse>,
+pub struct AllRankResponse {
+    pub ranks: HashMap<String, RankResponse>,
 }
 
 #[derive(Serialize, Deserialize)]
-struct InsertRequest {
-    in_game_name: String,
-    r#type: String,
-    time: i32,
-    game_name: String,
+pub struct InsertRequest {
+    pub in_game_name: String,
+    pub r#type: String,
+    pub time: i32,
+    pub game_name: String,
 }
 
 #[derive(Serialize, Deserialize)]
-struct InsertLevelRequest {
-    in_game_name: String,
-    old_level: i32,
-    new_level: i32,
-    time: i32,
+pub struct InsertLevelRequest {
+    pub in_game_name: String,
+    pub old_level: i32,
+    pub new_level: i32,
+    pub time: i32,
 }
 
 #[derive(Serialize, Deserialize)]
-struct InsertRankRequest {
-    in_game_name: String,
-    old_rank: i32,
-    old_rank_name: String,
-    new_rank: i32,
-    new_rank_name: String,
-    time: i32,
-    rank_type: String,
+pub struct InsertRankRequest {
+    pub in_game_name: String,
+    pub old_rank: i32,
+    pub old_rank_name: String,
+    pub new_rank: i32,
+    pub new_rank_name: String,
+    pub time: i32,
+    pub rank_type: String,
 }
