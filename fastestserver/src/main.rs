@@ -4,7 +4,9 @@ extern crate r2d2_sqlite;
 use actix_web::web::Json;
 use actix_web::{error, get, web, App, HttpServer, Result};
 use derive_more::{Display, Error};
-use fastestserver::db::{LevelUpdate, PartialRankUpdate, PlayingNow, PlayingTime, RankUpdate};
+use fastestserver::db::{
+    LevelUpdate, MonthlyCheck, PartialRankUpdate, PlayingNow, PlayingTime, RankUpdate,
+};
 use fastestserver::types::{AllLevelResponse, AllRankResponse, LevelResponse, RankResponse};
 use r2d2_sqlite::SqliteConnectionManager;
 use serde;
@@ -165,6 +167,29 @@ async fn get_latest_game_sessions(
                 gamename: row.get_unwrap(1),
                 started_at: row.get_unwrap(2),
                 ended_at: row.get_unwrap(3),
+            })
+        })
+        .map_err(conv_db_err)?;
+
+    Ok(web::Json(iter.map(|x| x.unwrap()).collect()))
+}
+
+#[get("/check/monthly")]
+async fn get_monthly_playing_time(data: web::Data<AppState>) -> Result<Json<Vec<MonthlyCheck>>> {
+    let db = data.pool.get().map_err(conv_db_err)?;
+
+    let mut stmt = db
+        .prepare("select username,gamename,month,year,playtime from monthlycheck")
+        .map_err(conv_db_err)?;
+
+    let iter = stmt
+        .query_map([], |row| {
+            Ok(MonthlyCheck {
+                username: row.get_unwrap(0),
+                gamename: row.get_unwrap(1),
+                month: row.get_unwrap(2),
+                year: row.get_unwrap(3),
+                playtime: row.get_unwrap(4),
             })
         })
         .map_err(conv_db_err)?;
