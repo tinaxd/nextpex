@@ -24,7 +24,7 @@ type UserDataDetail struct {
 
 func Connect(e *Environments) *sql.DB {
 	// Create db client
-	db, err := sql.Open("sqlite3", "../web/data/db.sqlite3")
+	db, err := sql.Open("sqlite3", "/data/db.sqlite3")
 	if err != nil {
 		log.Fatalf("db connect error: %v", err)
 	}

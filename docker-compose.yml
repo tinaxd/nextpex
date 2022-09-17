@@ -43,6 +43,7 @@ services:
     tty: true
     volumes:
       - ./watcher:/usr/src/app
+      - ./data:/data
     ports:
       - "8088:1323"
 volumes:
