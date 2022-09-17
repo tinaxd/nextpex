@@ -239,7 +239,7 @@ impl Handler {
         event: &GameEvent,
     ) -> serenity::Result<()> {
         let guild = &member.guild_id;
-        let chan = find_channel(ctx, guild, "self-apexability").await?;
+        let chan = find_channel(ctx, guild, "apexability-check").await?;
         if let Some(chan) = chan {
             let (tail, game, on) = match event {
                 GameEvent::Start(game) => (format!("{} を始めました！", game), game, true),
