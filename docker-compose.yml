@@ -1,31 +1,21 @@
 version: '3'
 services:
-  # api:
-  #   build: ./api
+  # db:
+  #   image: mariadb:latest
   #   environment:
-  #     - DB_USER=nextpex
-  #     - DB_PASS=nextpex
-  #     - DB_ADDR=db:3306
-  #     - DB_NAME=nextpex
+  #     - MARIADB_USER=nextpex
+  #     - MARIADB_PASSWORD=nextpex
+  #     - MARIADB_ROOT_PASSWORD=nextpex
+  #     - MARIADB_DATABASE=nextpex
   #   ports:
-  #     - "3601:1323"
-  #   depends_on:
-  #     - db
-  db:
-    image: mariadb:latest
-    environment:
-      - MARIADB_USER=nextpex
-      - MARIADB_PASSWORD=nextpex
-      - MARIADB_ROOT_PASSWORD=nextpex
-      - MARIADB_DATABASE=nextpex
-    ports:
-      - "3600:3306"
-    volumes:
-      - "dbdata:/var/lib/mysql"
-      - ./initdb.d:/docker-entrypoint-initdb.d
-    restart: always
+  #     - "3600:3306"
+  #   volumes:
+  #     - "dbdata:/var/lib/mysql"
+  #     - ./initdb.d:/docker-entrypoint-initdb.d
+  #   restart: always
+
   bot:
-    build: ./bot
+    build: ./botv2
     env_file:
       - bot.env
     depends_on:
@@ -33,11 +23,14 @@ services:
     profiles:
       - bot
     restart: always
-  web:
-    build: ./web
+  
+  api:
+    build: ./fastestserver
     ports:
-      - "3602:8000"
+      - "3601:9000"
     restart: always
+    volumes:
+      - ./data:/usr/src/app/data
 
   watcher:
     container_name: nextpex-watcher

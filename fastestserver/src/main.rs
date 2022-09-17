@@ -383,7 +383,7 @@ async fn insert_rank_update(
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    let manager = SqliteConnectionManager::file("db.sqlite3");
+    let manager = SqliteConnectionManager::file("data/db.sqlite3");
     let pool = r2d2::Pool::new(manager).unwrap();
 
     HttpServer::new(move || {
