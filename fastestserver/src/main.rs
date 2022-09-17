@@ -6,7 +6,8 @@ use actix_web::{error, get, post, web, App, HttpServer, Result};
 use derive_more::{Display, Error};
 use fastestserver::db::{LevelUpdate, MonthlyCheck, PartialRankUpdate, PlayingNow, PlayingTime};
 use fastestserver::types::{
-    AllLevelResponse, AllRankResponse, InsertRequest, LevelResponse, RankResponse,
+    AllLevelResponse, AllRankResponse, InsertLevelRequest, InsertRequest, LevelResponse,
+    RankResponse,
 };
 use r2d2::PooledConnection;
 use r2d2_sqlite::SqliteConnectionManager;
@@ -302,6 +303,32 @@ async fn insert_check(data: web::Data<AppState>, req: web::Json<InsertRequest>) 
     }
 }
 
+#[post("/level")]
+async fn insert_level_update(
+    data: web::Data<AppState>,
+    req: web::Json<InsertLevelRequest>,
+) -> Result<String> {
+    let mut db = data.pool.get().map_err(conv_db_err)?;
+
+    let username = get_username_from_ingamename(&db, &req.in_game_name).await?;
+    let username = match username {
+        None => return Err(error::ErrorNotFound("in-game name not found")),
+        Some(username) => username,
+    };
+
+    let tx = db.transaction().map_err(conv_db_err)?;
+
+    tx.execute(
+        "insert into levelupdate (username,oldlevel,newlevel,timeat) values (?,?,?,?)",
+        params![&username, req.old_level, req.new_level, req.time],
+    )
+    .map_err(conv_db_err)?;
+
+    tx.commit().map_err(conv_db_err)?;
+
+    Ok("".to_string())
+}
+
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     let manager = SqliteConnectionManager::file("db.sqlite3");
@@ -315,6 +342,8 @@ async fn main() -> std::io::Result<()> {
             .service(get_now_playing)
             .service(get_latest_game_sessions)
             .service(get_monthly_playing_time)
+            .service(insert_check)
+            .service(insert_level_update)
     })
     .bind(("127.0.0.1", 9000))?
     .run()
