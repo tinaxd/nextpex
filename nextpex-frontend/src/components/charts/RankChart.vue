@@ -6,12 +6,13 @@ defineProps<{
 </script>
 
 <template>
-  <Scatter :chart-data="chartInput" :chart-options="(chartOptions as any)" />
+  <Scatter ref="scatter" :chart-data="chartInput" :chart-options="(chartOptions as any)" v-on:mousedown="setCursorPosition" v-on:mouseup="resetDragZoom"/>
 </template>
 
 <script lang="ts">
 import { defineComponent } from "vue";
 import { registerables, Chart as ChartJS } from "chart.js";
+import zoomPlugin from 'chartjs-plugin-zoom';
 import axios from "axios";
 import randomColor from "randomcolor";
 export default defineComponent({
@@ -27,10 +28,11 @@ export default defineComponent({
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         backgroundColor: (ctx: any) => string;
       }[],
+      clickPosition: [0, 0] as [number, number],
     };
   },
   mounted() {
-    ChartJS.register(...registerables);
+    ChartJS.register(zoomPlugin,...registerables);
     this.fetchRanks();
   },
   watch: {
@@ -129,6 +131,22 @@ export default defineComponent({
           backgroundColor: (ctx: any) => colors[user],
         };
       });
+    },
+    setCursorPosition(event: MouseEvent) {
+      this.clickPosition[0] = event.screenX;
+      this.clickPosition[1] = event.screenY;
+    },
+    resetDragZoom(event: MouseEvent) {
+      console.log("reset",event, Math.abs(this.clickPosition[0] - event.screenX), Math.abs(this.clickPosition[1] - event.screenY), this.clickPosition);
+      if (
+          Math.abs(this.clickPosition[0] - event.screenX) < 15 &&
+          Math.abs(this.clickPosition[1] - event.screenY) < 15
+      ) {
+        // eslint-disable-next-line
+        // (this.$refs.chartJs as any).resetZoom();
+        console.log("reset");
+        (this.$refs.scatter as any).chart.resetZoom();
+      }
     },
   },
 });

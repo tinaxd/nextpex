@@ -10,7 +10,7 @@ import CheckCard from "../components/cards/CheckCard.vue";
       <div
         class="card card-level"
         :class="{ clickable: !showModal() }"
-        @click.stop="onClickCard('level')"
+        @dblclick.stop="onClickCard('level')"
         v-show="modalType !== 'level'"
       >
         <LevelCard />
@@ -18,7 +18,7 @@ import CheckCard from "../components/cards/CheckCard.vue";
       <div
         class="card card-rank"
         :class="{ clickable: !showModal() }"
-        @click.stop="onClickCard('rank')"
+        @dblclick.stop="onClickCard('rank')"
         v-show="modalType !== 'rank'"
       >
         <RankCard :rank-type="rankType">
