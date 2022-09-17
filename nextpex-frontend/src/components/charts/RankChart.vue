@@ -106,7 +106,7 @@ export default defineComponent({
   methods: {
     async fetchRanks() {
       const response = await axios.get(`/rank/${this.rankType}/all`);
-      const ranks = response.data as {
+      const ranks = response.data.ranks as {
         [key: string]: { rank: number; time: number; rank_name: string }[];
       };
 

@@ -105,7 +105,7 @@ export default defineComponent({
   methods: {
     async fetchLevels() {
       const response = await axios.get("/level/all");
-      const levels = response.data as {
+      const levels = response.data.levels as {
         [key: string]: { level: number; time: number }[];
       };
 
