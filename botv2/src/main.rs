@@ -273,7 +273,7 @@ impl Handler {
         let url = format!("{}/check", &self.web_api);
         let body = NextpexCheckRequest {
             in_game_name: name.to_string(),
-            r#type: if is_start { "start" } else { "end" }.to_string(),
+            r#type: if is_start { "start" } else { "stop" }.to_string(),
             time: time.timestamp(),
             game_name: game_name.to_string(),
         };
@@ -284,7 +284,7 @@ impl Handler {
             Ok(body) => {
                 println!("sending to nextpex: {:?}", &body);
                 let client = reqwest::Client::new();
-                let res = client.post(url).body(body).send().await;
+                let res = client.post(url).json(&body).send().await;
                 match res {
                     Err(e) => println!("nextpex api error: {:?}", e),
                     Ok(res) => {
