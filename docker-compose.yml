@@ -26,6 +26,7 @@ services:
       - botv2/.env
     depends_on:
       - api
+      - redis
     profiles:
       - bot
     restart: always
@@ -39,6 +40,8 @@ services:
       - ./data:/usr/src/app/data
     env_file:
       - fastestserver/.env
+    depends_on:
+      - redis
 
   watcher:
     container_name: nextpex-watcher
