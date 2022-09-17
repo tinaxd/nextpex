@@ -22,6 +22,29 @@ type UserDataDetail struct {
 	ArenaRank int `db:"arena_rank"`
 }
 
+func Initialize() {
+	db, err := sql.Open("sqlite3", "/data/db.sqlite3")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+
+	// Create table
+	query := `CREATE TABLE IF NOT EXISTS user_data (
+		uid TEXT PRIMARY KEY,
+		platform TEXT,
+		level INTEGER,
+		trio_rank INTEGER,
+		arena_rank INTEGER,
+		last_update INTEGER
+	)`
+	_, err = db.Exec(query)
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
+}
+
 func Connect(e *Environments) *sql.DB {
 	// Create db client
 	db, err := sql.Open("sqlite3", "/data/db.sqlite3")

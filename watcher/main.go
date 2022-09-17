@@ -17,6 +17,7 @@ var envs models.Environments
 func main() {
 	// Load environment values
 	envs = models.LoadEnv(false)
+	models.Initialize()
 	// Echo instance
 	e := echo.New()
 
