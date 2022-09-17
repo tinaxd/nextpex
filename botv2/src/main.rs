@@ -282,6 +282,7 @@ impl Handler {
         match body {
             Err(e) => println!("json serialize error: {:?}", e),
             Ok(body) => {
+                println!("sending to nextpex: {:?}", &body);
                 let client = reqwest::Client::new();
                 let res = client.post(url).body(body).send().await;
                 match res {
