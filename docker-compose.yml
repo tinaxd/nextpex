@@ -14,6 +14,16 @@ services:
   #     - ./initdb.d:/docker-entrypoint-initdb.d
   #   restart: always
 
+  frontend:
+    build: ./nextpex-frontend
+    restart: always
+    ports:
+      - "3600:80"
+    depends_on:
+      - api
+    profiles:
+      - frontend
+
   redis:
     image: redis:latest
     volumes:
