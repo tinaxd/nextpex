@@ -1,0 +1,1 @@
+0 * * * * /usr/src/app/cronjob.sh >/dev/null 2>&1

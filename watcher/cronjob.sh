@@ -1,2 +1,2 @@
-#!/bin/bash
-curl http://localhost:8088/watcher/all
+#!/bin/sh
+curl http://localhost:1323/
