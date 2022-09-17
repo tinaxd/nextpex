@@ -277,30 +277,24 @@ impl Handler {
             time: time.timestamp(),
             game_name: game_name.to_string(),
         };
-        let body = serde_json::to_string(&body);
 
-        match body {
-            Err(e) => println!("json serialize error: {:?}", e),
-            Ok(body) => {
-                println!("sending to nextpex: {:?}", &body);
-                let client = reqwest::Client::new();
-                let res = client
-                    .post(url)
-                    .json(&body)
-                    .header("Content-Type", "application/json")
-                    .send()
-                    .await;
-                match res {
-                    Err(e) => println!("nextpex api error: {:?}", e),
-                    Ok(res) => {
-                        if !res.status().is_success() {
-                            println!(
-                                "nextpex api 
+        println!("sending to nextpex: {:?}", &body);
+        let client = reqwest::Client::new();
+        let res = client
+            .post(url)
+            .json(&body)
+            .header("Content-Type", "application/json")
+            .send()
+            .await;
+        match res {
+            Err(e) => println!("nextpex api error: {:?}", e),
+            Ok(res) => {
+                if !res.status().is_success() {
+                    println!(
+                        "nextpex api 
                             returned failure code: {:?}",
-                                res
-                            );
-                        }
-                    }
+                        res
+                    );
                 }
             }
         }
