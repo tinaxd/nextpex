@@ -1,3 +1,5 @@
+use serde;
+
 #[derive(Debug, Clone)]
 pub struct LevelUpdate {
     pub new_level: i32,
@@ -27,7 +29,7 @@ pub struct PartialRankUpdate {
     // pub rank_type: String,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct PlayingTime {
     pub username: String,
     pub gamename: String,
@@ -35,14 +37,14 @@ pub struct PlayingTime {
     pub ended_at: i32,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct PlayingNow {
     pub username: String,
     pub gamename: String,
     pub started_at: i32,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct MonthlyCheck {
     pub username: String,
     pub gamename: String,

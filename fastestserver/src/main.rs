@@ -4,10 +4,10 @@ extern crate r2d2_sqlite;
 use actix_web::web::Json;
 use actix_web::{error, get, web, App, HttpServer, Result};
 use derive_more::{Display, Error};
-use fastestserver::db::{LevelUpdate, PartialRankUpdate, RankUpdate};
+use fastestserver::db::{LevelUpdate, PartialRankUpdate, PlayingNow, PlayingTime, RankUpdate};
 use fastestserver::types::{AllLevelResponse, AllRankResponse, LevelResponse, RankResponse};
 use r2d2_sqlite::SqliteConnectionManager;
-use rusqlite::Connection;
+use serde;
 
 #[derive(Debug, Clone)]
 struct AppState {
@@ -124,6 +124,54 @@ async fn get_all_ranks(
     Ok(web::Json(AllRankResponse { ranks: rank_map }))
 }
 
+#[get("/check/now")]
+async fn get_now_playing(data: web::Data<AppState>) -> Result<Json<Vec<PlayingNow>>> {
+    let db = data.pool.get().map_err(conv_db_err)?;
+
+    let mut stmt = db
+        .prepare("select username,gamename,startedat from playingnow order by startedat desc")
+        .map_err(conv_db_err)?;
+    let playing_iter = stmt
+        .query_map([], |row| {
+            Ok(PlayingNow {
+                username: row.get_unwrap(0),
+                gamename: row.get_unwrap(1),
+                started_at: row.get_unwrap(2),
+            })
+        })
+        .unwrap();
+
+    Ok(web::Json(playing_iter.map(|x| x.unwrap()).collect()))
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+struct LimitQuery {
+    limit: Option<u32>,
+}
+
+#[get("/check/history")]
+async fn get_latest_game_sessions(
+    data: web::Data<AppState>,
+    limit: web::Query<LimitQuery>,
+) -> Result<Json<Vec<PlayingTime>>> {
+    let limit = limit.limit.unwrap_or(20);
+
+    let db = data.pool.get().map_err(conv_db_err)?;
+    let mut stmt = db.prepare("select username,gamename,startedat,endedat from playingtime order by endedat desc limit ?").map_err(conv_db_err)?;
+    let iter = stmt
+        .query_map([limit], |row| {
+            Ok(PlayingTime {
+                username: row.get_unwrap(0),
+                gamename: row.get_unwrap(1),
+                started_at: row.get_unwrap(2),
+                ended_at: row.get_unwrap(3),
+            })
+        })
+        .map_err(conv_db_err)?;
+
+    Ok(web::Json(iter.map(|x| x.unwrap()).collect()))
+}
+
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     let manager = SqliteConnectionManager::file("db.sqlite3");
@@ -134,6 +182,7 @@ async fn main() -> std::io::Result<()> {
             .app_data(web::Data::new(AppState { pool: pool.clone() }))
             .service(get_all_levels)
             .service(get_all_ranks)
+            .service(get_now_playing)
     })
     .bind(("127.0.0.1", 9000))?
     .run()
