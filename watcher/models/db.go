@@ -13,13 +13,13 @@ type UserData struct {
 	Uid        string `db:"uid"`
 	Platform   string `db:"platform"`
 	Stats      UserDataDetail
-	LastUpdate int `db:"last_update"`
+	LastUpdate sql.NullInt64 `db:"last_update"`
 }
 
 type UserDataDetail struct {
-	Level     int `db:"level"`
-	TrioRank  int `db:"trio_rank"`
-	ArenaRank int `db:"arena_rank"`
+	Level     sql.NullInt32 `db:"level"`
+	TrioRank  sql.NullInt32 `db:"trio_rank"`
+	ArenaRank sql.NullInt32 `db:"arena_rank"`
 }
 
 func Initialize() {
@@ -154,7 +154,7 @@ func UpdatePlayerArenaRank(db *sql.DB, userID string, arenaRank int) bool {
 func UpdatePlayerData(db *sql.DB, userID string, ud UserDataDetail) {
 	timestamp := time.Now().Unix()
 	query := `UPDATE user_data set level=?,trio_rank=?,arena_rank=?,last_update=? WHERE uid=?`
-	_, err := db.Exec(query, ud.Level, ud.TrioRank, ud.ArenaRank, timestamp, userID)
+	_, err := db.Exec(query, ud.Level.Int32, ud.TrioRank.Int32, ud.ArenaRank.Int32, timestamp, userID)
 	if err != nil {
 		log.Fatal(err)
 		return

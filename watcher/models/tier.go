@@ -13,7 +13,7 @@ const (
 	ArenaDiamond  = 8000
 )
 
-func getUpperLimit(tier, types string) int {
+func getUpperLimit(tier, types string) int32 {
 	limit := 0
 	switch tier {
 	case "bronze":
@@ -47,10 +47,10 @@ func getUpperLimit(tier, types string) int {
 			limit = ArenaDiamond
 		}
 	}
-	return limit
+	return int32(limit)
 }
 
-func GetRankName(rank int, types string) string {
+func GetRankName(rank int32, types string) string {
 	var rankName string
 	switch {
 	case rank < getUpperLimit("bronze", types):
@@ -68,7 +68,7 @@ func GetRankName(rank int, types string) string {
 	return rankName
 }
 
-func GetTierBadge(env *Environments, rank int, types string) string {
+func GetTierBadge(env *Environments, rank int32, types string) string {
 	var badge string
 	switch {
 	case rank < getUpperLimit("bronze", types):
