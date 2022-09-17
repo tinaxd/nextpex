@@ -17,7 +17,7 @@ services:
   bot:
     build: ./botv2
     env_file:
-      - bot.env
+      - botv2/.env
     depends_on:
       - api
     profiles:
@@ -31,6 +31,8 @@ services:
     restart: always
     volumes:
       - ./data:/usr/src/app/data
+    env_file:
+      - fastestserver/.env
 
   watcher:
     container_name: nextpex-watcher

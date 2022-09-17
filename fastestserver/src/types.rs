@@ -51,3 +51,8 @@ pub struct InsertRankRequest {
     pub time: i32,
     pub rank_type: String,
 }
+
+#[derive(Serialize, Deserialize)]
+pub struct MinecraftJoinedOrLeftRequest {
+    pub username: String,
+}
