@@ -1,11 +1,11 @@
 package models
 
 const (
-	TrioBronze    = 1200
-	TrioSilver    = 2800
-	TrioGold      = 4800
-	TrioPlatinum  = 7200
-	TrioDiamond   = 10000
+	TrioBronze    = 3000
+	TrioSilver    = 5400
+	TrioGold      = 8200
+	TrioPlatinum  = 11400
+	TrioDiamond   = 15000
 	ArenaBronze   = 1600
 	ArenaSilver   = 3200
 	ArenaGold     = 4800
