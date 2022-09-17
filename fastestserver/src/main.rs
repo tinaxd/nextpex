@@ -1,7 +1,6 @@
 extern crate r2d2;
 extern crate r2d2_sqlite;
 
-use actix_web::cookie::time::Month;
 use actix_web::web::Json;
 use actix_web::{error, get, post, web, App, HttpServer, Result};
 use derive_more::{Display, Error};
