@@ -11,21 +11,21 @@ import (
 type level struct {
 	PlayerName string `json:"in_game_name"`
 	Timestamp  int64  `json:"time"`
-	OldLevel   int    `json:"old_level"`
-	NewLevel   int    `json:"new_level"`
+	OldLevel   int32  `json:"old_level"`
+	NewLevel   int32  `json:"new_level"`
 }
 
 type rank struct {
 	PlayerName  string `json:"in_game_name"`
 	Timestamp   int64  `json:"time"`
-	OldRank     int    `json:"old_rank"`
+	OldRank     int32  `json:"old_rank"`
 	OldRankName string `json:"old_rank_name"`
-	NewRank     int    `json:"new_rank"`
+	NewRank     int32  `json:"new_rank"`
 	NewRankName string `json:"new_rank_name"`
 	RankType    string `json:"rank_type"`
 }
 
-func PostLevel(e *Environments, userID string, oldLevel, newLevel int) {
+func PostLevel(userID string, oldLevel, newLevel int32) {
 	timestamp := time.Now().Unix()
 	jsonData, _ := json.Marshal(level{
 		PlayerName: userID,
@@ -33,7 +33,7 @@ func PostLevel(e *Environments, userID string, oldLevel, newLevel int) {
 		OldLevel:   oldLevel,
 		NewLevel:   newLevel,
 	})
-	res, err := http.Post(e.TINAX_API_ENDPOINT+"/level", "application/json", bytes.NewBuffer(jsonData))
+	res, err := http.Post("http://nextpex-api:9000/level", "application/json", bytes.NewBuffer(jsonData))
 	defer res.Body.Close()
 
 	if err != nil {
@@ -43,7 +43,7 @@ func PostLevel(e *Environments, userID string, oldLevel, newLevel int) {
 	}
 }
 
-func PostRank(e *Environments, userID, rankType string, oldRank, newRank int) {
+func PostRank(userID, rankType string, oldRank, newRank int32) {
 	timestamp := time.Now().Unix()
 	jsonData, _ := json.Marshal(rank{
 		PlayerName:  userID,
@@ -54,7 +54,7 @@ func PostRank(e *Environments, userID, rankType string, oldRank, newRank int) {
 		NewRankName: GetRankName(newRank, rankType),
 		RankType:    rankType,
 	})
-	res, err := http.Post(e.TINAX_API_ENDPOINT+"/rank", "application/json", bytes.NewBuffer(jsonData))
+	res, err := http.Post("http://nextpex-api:9000/rank", "application/json", bytes.NewBuffer(jsonData))
 	defer res.Body.Close()
 
 	if err != nil {

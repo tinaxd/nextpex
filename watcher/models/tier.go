@@ -1,11 +1,11 @@
 package models
 
 const (
-	TrioBronze    = 1200
-	TrioSilver    = 2800
-	TrioGold      = 4800
-	TrioPlatinum  = 7200
-	TrioDiamond   = 10000
+	TrioBronze    = 3000
+	TrioSilver    = 5400
+	TrioGold      = 8200
+	TrioPlatinum  = 11400
+	TrioDiamond   = 15000
 	ArenaBronze   = 1600
 	ArenaSilver   = 3200
 	ArenaGold     = 4800
@@ -13,7 +13,7 @@ const (
 	ArenaDiamond  = 8000
 )
 
-func getUpperLimit(tier, types string) int {
+func getUpperLimit(tier, types string) int32 {
 	limit := 0
 	switch tier {
 	case "bronze":
@@ -47,10 +47,10 @@ func getUpperLimit(tier, types string) int {
 			limit = ArenaDiamond
 		}
 	}
-	return limit
+	return int32(limit)
 }
 
-func GetRankName(rank int, types string) string {
+func GetRankName(rank int32, types string) string {
 	var rankName string
 	switch {
 	case rank < getUpperLimit("bronze", types):
@@ -68,19 +68,19 @@ func GetRankName(rank int, types string) string {
 	return rankName
 }
 
-func GetTierBadge(env *Environments, rank int, types string) string {
+func GetTierBadge(env *Environments, rank int32, types string) string {
 	var badge string
 	switch {
 	case rank < getUpperLimit("bronze", types):
-		badge = env.BRONZE_BADGE
+		badge = env.BronzeBadge
 	case rank < getUpperLimit("silver", types):
-		badge = env.SILVER_BADGE
+		badge = env.SilverBadge
 	case rank < getUpperLimit("gold", types):
-		badge = env.GOLD_BADGE
+		badge = env.GoldBadge
 	case rank < getUpperLimit("platinum", types):
-		badge = env.PLATINUM_BADGE
+		badge = env.PlatinumBadge
 	default:
-		badge = env.DIAMOND_BADGE
+		badge = env.DiamondBadge
 	}
 
 	return badge

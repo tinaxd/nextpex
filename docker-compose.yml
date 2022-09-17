@@ -42,6 +42,7 @@ services:
     restart: always
   
   api:
+    container_name: nextpex-api
     build: ./fastestserver
     ports:
       - "3601:9000"
@@ -64,6 +65,7 @@ services:
     tty: true
     volumes:
       - ./watcher:/usr/src/app
+      - ./data:/data
     ports:
       - "8088:1323"
 volumes:
