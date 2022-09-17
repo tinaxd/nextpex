@@ -1,22 +1,29 @@
+extern crate actix_web;
 extern crate r2d2;
 extern crate r2d2_sqlite;
+extern crate redis;
 
+use actix_web::http::header::{Header, HeaderName, TryIntoHeaderValue};
 use actix_web::web::Json;
-use actix_web::{error, get, post, web, App, HttpServer, Result};
+use actix_web::{error, get, post, web, App, HttpRequest, HttpServer, ResponseError, Result};
 use derive_more::{Display, Error};
 use fastestserver::db::{LevelUpdate, MonthlyCheck, PartialRankUpdate, PlayingNow, PlayingTime};
 use fastestserver::types::{
     AllLevelResponse, AllRankResponse, InsertLevelRequest, InsertRankRequest, InsertRequest,
-    LevelResponse, RankResponse,
+    LevelResponse, MinecraftJoinedOrLeftRequest, RankResponse,
 };
 use r2d2::PooledConnection;
 use r2d2_sqlite::SqliteConnectionManager;
+use redis::AsyncCommands;
+use redis::RedisError;
 use rusqlite::params;
 use serde;
 
 #[derive(Debug, Clone)]
 struct AppState {
     pool: r2d2::Pool<SqliteConnectionManager>,
+    secret_key: String,
+    redis: redis::Client,
 }
 
 #[derive(Debug, Display, Error)]
@@ -381,14 +388,90 @@ async fn insert_rank_update(
     Ok("".to_string())
 }
 
+fn validate_secret(req: &HttpRequest, data: &web::Data<AppState>) -> Result<()> {
+    let secret = req.headers().get("X-Nextpex-Secret");
+    match secret {
+        None => Err(error::ErrorUnauthorized("need auth")),
+        Some(secret) => {
+            if secret != &data.secret_key {
+                Err(error::ErrorUnauthorized("invalid secret"))
+            } else {
+                Ok(())
+            }
+        }
+    }
+}
+
+fn conv_redis_err<T>(_err: T) -> error::Error {
+    error::ErrorInternalServerError("redis error")
+}
+
+#[post("/minecraft/joined")]
+async fn minecraft_joined(
+    data: web::Data<AppState>,
+    req: HttpRequest,
+    body: web::Data<MinecraftJoinedOrLeftRequest>,
+) -> Result<String> {
+    validate_secret(&req, &data)?;
+
+    let mut conn = data
+        .redis
+        .get_async_connection()
+        .await
+        .map_err(conv_redis_err)?;
+
+    redis::pipe()
+        .sadd("mc_players", &body.username)
+        .lpush("mc_event", format!("connected:{}", &body.username))
+        .query_async(&mut conn)
+        .await
+        .map_err(conv_redis_err)?;
+
+    Ok("".to_string())
+}
+
+#[post("/minecraft/left")]
+async fn minecraft_left(
+    data: web::Data<AppState>,
+    req: HttpRequest,
+    body: web::Data<MinecraftJoinedOrLeftRequest>,
+) -> Result<String> {
+    validate_secret(&req, &data)?;
+
+    let mut conn = data
+        .redis
+        .get_async_connection()
+        .await
+        .map_err(conv_redis_err)?;
+
+    redis::pipe()
+        .srem("mc_players", &body.username)
+        .lpush("mc_event", format!("disconnected:{}", &body.username))
+        .query_async(&mut conn)
+        .await
+        .map_err(conv_redis_err)?;
+
+    Ok("".to_string())
+}
+
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     let manager = SqliteConnectionManager::file("data/db.sqlite3");
     let pool = r2d2::Pool::new(manager).unwrap();
 
     HttpServer::new(move || {
+        let secret_key = std::env::var("SECRET_KEY").expect("SECRET_KEY not set");
+        let redis_host = std::env::var("REDIS_HOST").expect("REDIS_HOST not set");
+        let redis_port = std::env::var("REDIS_PORT").expect("REDIS_PORT not set");
+
+        let redis_connstr = format!("redis://{}:{}", redis_host, redis_port);
+        let redis_client = redis::Client::open(redis_connstr).expect("could not connect to redis");
         App::new()
-            .app_data(web::Data::new(AppState { pool: pool.clone() }))
+            .app_data(web::Data::new(AppState {
+                pool: pool.clone(),
+                secret_key: secret_key,
+                redis: redis_client,
+            }))
             .service(get_all_levels)
             .service(get_all_ranks)
             .service(get_now_playing)
