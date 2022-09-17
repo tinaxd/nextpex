@@ -1,6 +1,7 @@
 extern crate r2d2;
 extern crate r2d2_sqlite;
 
+use actix_web::cookie::time::Month;
 use actix_web::web::Json;
 use actix_web::{error, get, post, web, App, HttpServer, Result};
 use derive_more::{Display, Error};
@@ -187,17 +188,43 @@ async fn get_monthly_playing_time(data: web::Data<AppState>) -> Result<Json<Vec<
 
     let iter = stmt
         .query_map([], |row| {
-            Ok(MonthlyCheck {
-                username: row.get_unwrap(0),
-                gamename: row.get_unwrap(1),
-                month: row.get_unwrap(2),
-                year: row.get_unwrap(3),
-                playtime: row.get_unwrap(4),
-            })
+            Ok((
+                row.get_unwrap(0),
+                row.get_unwrap(1),
+                row.get_unwrap(2),
+                row.get_unwrap(3),
+                row.get_unwrap(4),
+            ))
         })
         .map_err(conv_db_err)?;
 
-    Ok(web::Json(iter.map(|x| x.unwrap()).collect()))
+    let s2i = |s: String| s.parse::<i32>().ok();
+
+    let vec = iter
+        .map(|x| {
+            let (username, gamename, month, year, playtime) = x.unwrap();
+            Some(MonthlyCheck {
+                username,
+                gamename,
+                month: s2i(month)?,
+                year: s2i(year)?,
+                playtime,
+            })
+        })
+        .collect::<Vec<Option<MonthlyCheck>>>();
+    let vec_len = vec.len();
+
+    let clean_vec = vec
+        .into_iter()
+        .filter(|x| x.is_some())
+        .map(|x| x.unwrap())
+        .collect::<Vec<MonthlyCheck>>();
+
+    if vec_len != clean_vec.len() {
+        return Err(conv_db_err(()));
+    }
+
+    Ok(web::Json(clean_vec))
 }
 
 // type DBPool = r2d2::Pool<SqliteConnectionManager>;
