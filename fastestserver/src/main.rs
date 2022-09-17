@@ -398,7 +398,7 @@ async fn main() -> std::io::Result<()> {
             .service(insert_level_update)
             .service(insert_rank_update)
     })
-    .bind(("127.0.0.1", 9000))?
+    .bind(("0.0.0.0", 9000))?
     .run()
     .await
 }
