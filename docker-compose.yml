@@ -25,6 +25,7 @@ services:
     restart: always
   
   api:
+    container_name: nextpex-api
     build: ./fastestserver
     ports:
       - "3601:9000"

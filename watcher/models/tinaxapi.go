@@ -33,7 +33,7 @@ func PostLevel(e *Environments, userID string, oldLevel, newLevel int32) {
 		OldLevel:   oldLevel,
 		NewLevel:   newLevel,
 	})
-	res, err := http.Post(e.TINAX_API_ENDPOINT+"/level", "application/json", bytes.NewBuffer(jsonData))
+	res, err := http.Post("http://nextpex-api:9000/level", "application/json", bytes.NewBuffer(jsonData))
 	defer res.Body.Close()
 
 	if err != nil {
@@ -54,8 +54,7 @@ func PostRank(e *Environments, userID, rankType string, oldRank, newRank int32) 
 		NewRankName: GetRankName(newRank, rankType),
 		RankType:    rankType,
 	})
-	fmt.Println(e.TINAX_API_ENDPOINT + "/rank")
-	res, err := http.Post(e.TINAX_API_ENDPOINT+"/rank", "application/json", bytes.NewBuffer(jsonData))
+	res, err := http.Post("http://nextpex-api:9000/rank", "application/json", bytes.NewBuffer(jsonData))
 	defer res.Body.Close()
 
 	if err != nil {
