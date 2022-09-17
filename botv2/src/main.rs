@@ -58,6 +58,30 @@ async fn get_guild_ids(
     }
 }
 
+async fn clear_and_add_guild_ids(
+    conn: &mut redis::aio::Connection,
+    guild_ids: impl std::iter::Iterator<Item = serenity::model::id::GuildId>,
+) -> RedisResult<()> {
+    let mut pipe = redis::pipe();
+    pipe.del("guild_ids");
+    println!("guild_ids cleared");
+    guild_ids.into_iter().for_each(|x| {
+        pipe.sadd("guild_ids", x.0);
+        println!("added guilds id {}", x.0);
+    });
+    pipe.query_async(conn).await?;
+    Ok(())
+}
+
+async fn add_guild_id(
+    conn: &mut redis::aio::Connection,
+    guild_id: &serenity::model::id::GuildId,
+) -> RedisResult<()> {
+    conn.sadd("guild_ids", guild_id.0).await?;
+    println!("added guilds id {}", guild_id.0);
+    Ok(())
+}
+
 async fn get_target_channel(
     conn: &mut redis::aio::Connection,
     guild_id: &serenity::model::id::GuildId,
@@ -90,49 +114,62 @@ fn build_message(players: &[String]) -> String {
     }
 }
 
+#[derive(Debug, Clone)]
+enum EventParseResult {
+    UnknownEvent,
+    InvalidFormat,
+    ValidMessage(String),
+}
+
 async fn process_event(
     conn: &mut redis::aio::Connection,
     ctx: &Context,
     event: &str,
 ) -> Result<(), String> {
-    let mut split = event.split(":");
-    if let Some(event_name) = split.nth(0) {
-        if let Some(text) = match event_name {
+    let split = event
+        .split(":")
+        .map(|s| s.to_owned())
+        .collect::<Vec<String>>();
+    if let Some(event_name) = split.get(0) {
+        use EventParseResult::*;
+        match match event_name.as_str() {
             "connected" => {
-                if let Some(player) = split.nth(1) {
-                    Some(format!("{} がサーバーに参加しました！", player))
+                if let Some(player) = split.get(1) {
+                    ValidMessage(format!("{} がサーバーに参加しました！", player))
                 } else {
-                    None
+                    InvalidFormat
                 }
             }
             "disconnected" => {
-                if let Some(player) = split.nth(1) {
-                    Some(format!("{} がサーバーから抜けました！", player))
+                if let Some(player) = split.get(1) {
+                    ValidMessage(format!("{} がサーバーから抜けました！", player))
                 } else {
-                    None
+                    InvalidFormat
                 }
             }
-            _ => None,
+            _ => UnknownEvent,
         } {
-            let guild_ids = get_guild_ids(conn).await.map_err(|e| e.to_string())?;
-            for guild_id in guild_ids {
-                match get_target_channel(conn, &guild_id).await {
-                    Err(e) => return Err(e.to_string()),
-                    Ok(channel_id) => match channel_id {
-                        Some(channel_id) => {
-                            if let Err(e) = channel_id.say(&ctx.http, text.as_str()).await {
-                                return Err(e.to_string());
+            ValidMessage(text) => {
+                let guild_ids = get_guild_ids(conn).await.map_err(|e| e.to_string())?;
+                for guild_id in guild_ids {
+                    match get_target_channel(conn, &guild_id).await {
+                        Err(e) => return Err(e.to_string()),
+                        Ok(channel_id) => match channel_id {
+                            Some(channel_id) => {
+                                if let Err(e) = channel_id.say(&ctx.http, text.as_str()).await {
+                                    return Err(e.to_string());
+                                }
                             }
-                        }
-                        None => {
-                            println!("target channel for guild {} is not set", guild_id);
-                        }
-                    },
+                            None => {
+                                println!("target channel for guild {} is not set", guild_id);
+                            }
+                        },
+                    }
                 }
+                Ok(())
             }
-            Ok(())
-        } else {
-            Err(format!("unknown event name: {}", event_name))
+            InvalidFormat => Err(format!("Error: invalid format: {}", event)),
+            UnknownEvent => Err(format!("Error: unknown event: {}", event)),
         }
     } else {
         Err(format!("Error: event name not found"))
@@ -379,6 +416,7 @@ impl EventHandler for Handler {
         if !content.starts_with(prefix) {
             return;
         }
+
         let content = &content[prefix.len()..];
         // println!("content: {} ", content);
         if content == "players" {
@@ -422,6 +460,17 @@ impl EventHandler for Handler {
                         {
                             println!("Error sending message: {:?}", why);
                         }
+
+                        match msg.guild_id {
+                            None => {
+                                println!("guild id not found")
+                            }
+                            Some(guild_id) => {
+                                if let Err(e) = add_guild_id(&mut conn, &guild_id).await {
+                                    println!("Error add_guild_ids: {:?}", e);
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -445,16 +494,25 @@ impl EventHandler for Handler {
             .expect("failed to get redis connection");
         {
             let ctx = ctx.clone();
-            tokio::spawn(async move { redis_loop(conn, ctx) });
+            tokio::spawn(async move { redis_loop(conn, ctx).await });
         }
 
         // send self-apexability msg
         let guilds = ready.guilds;
-        for guild in guilds {
+        for guild in &guilds {
             let guild_id = guild.id;
             if let Err(e) = self.send_apexability_msg(&ctx, &guild_id).await {
                 println!("self apexability send Error: {:?}", e);
             }
+        }
+
+        let mut conn = self
+            .redis
+            .get_async_connection()
+            .await
+            .expect("failed to get redis connection");
+        if let Err(e) = clear_and_add_guild_ids(&mut conn, guilds.iter().map(|g| g.id)).await {
+            println!("add_guild_ids Error: {:?}", e);
         }
     }
 

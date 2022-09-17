@@ -1,11 +1,11 @@
 extern crate actix_web;
+extern crate env_logger;
 extern crate r2d2;
 extern crate r2d2_sqlite;
 extern crate redis;
 
-use actix_web::http::header::{Header, HeaderName, TryIntoHeaderValue};
 use actix_web::web::Json;
-use actix_web::{error, get, post, web, App, HttpRequest, HttpServer, ResponseError, Result};
+use actix_web::{error, get, post, web, App, HttpRequest, HttpServer, Result};
 use derive_more::{Display, Error};
 use fastestserver::db::{LevelUpdate, MonthlyCheck, PartialRankUpdate, PlayingNow, PlayingTime};
 use fastestserver::types::{
@@ -14,8 +14,8 @@ use fastestserver::types::{
 };
 use r2d2::PooledConnection;
 use r2d2_sqlite::SqliteConnectionManager;
+#[allow(unused_imports)]
 use redis::AsyncCommands;
-use redis::RedisError;
 use rusqlite::params;
 use serde;
 
@@ -410,7 +410,7 @@ fn conv_redis_err<T>(_err: T) -> error::Error {
 async fn minecraft_joined(
     data: web::Data<AppState>,
     req: HttpRequest,
-    body: web::Data<MinecraftJoinedOrLeftRequest>,
+    body: web::Json<MinecraftJoinedOrLeftRequest>,
 ) -> Result<String> {
     validate_secret(&req, &data)?;
 
@@ -434,7 +434,7 @@ async fn minecraft_joined(
 async fn minecraft_left(
     data: web::Data<AppState>,
     req: HttpRequest,
-    body: web::Data<MinecraftJoinedOrLeftRequest>,
+    body: web::Json<MinecraftJoinedOrLeftRequest>,
 ) -> Result<String> {
     validate_secret(&req, &data)?;
 
@@ -456,6 +456,8 @@ async fn minecraft_left(
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+    env_logger::init();
+
     let manager = SqliteConnectionManager::file("data/db.sqlite3");
     let pool = r2d2::Pool::new(manager).unwrap();
 
@@ -480,6 +482,8 @@ async fn main() -> std::io::Result<()> {
             .service(insert_check)
             .service(insert_level_update)
             .service(insert_rank_update)
+            .service(minecraft_joined)
+            .service(minecraft_left)
     })
     .bind(("0.0.0.0", 9000))?
     .run()
