@@ -749,7 +749,10 @@ async fn main() {
         | GatewayIntents::GUILD_MESSAGE_REACTIONS
         | GatewayIntents::GUILD_PRESENCES;
 
-    let r = redis::Client::open("redis://localhost:6379").expect("redis fail");
+    let redis_host = env::var("REDIS_HOST").expect("REDIS_HOST not set");
+    let redis_port = env::var("REDIS_PORT").expect("REDIS_PORT not set");
+    let r =
+        redis::Client::open(format!("redis://{}:{}", redis_host, redis_port)).expect("redis fail");
 
     // Create a new instance of the Client, logging in as a bot. This will
     // automatically prepend your bot token with "Bot ", which is a requirement
