@@ -284,7 +284,12 @@ impl Handler {
             Ok(body) => {
                 println!("sending to nextpex: {:?}", &body);
                 let client = reqwest::Client::new();
-                let res = client.post(url).json(&body).send().await;
+                let res = client
+                    .post(url)
+                    .json(&body)
+                    .header("Content-Type", "application/json")
+                    .send()
+                    .await;
                 match res {
                     Err(e) => println!("nextpex api error: {:?}", e),
                     Ok(res) => {
