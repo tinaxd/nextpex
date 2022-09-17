@@ -6,6 +6,8 @@ extern crate redis;
 
 use actix_web::web::Json;
 use actix_web::{error, get, post, web, App, HttpRequest, HttpServer, Result};
+use actix_web::http::header;
+use actix_cors::Cors;
 use derive_more::{Display, Error};
 use fastestserver::db::{LevelUpdate, MonthlyCheck, PartialRankUpdate, PlayingNow, PlayingTime};
 use fastestserver::types::{
@@ -483,6 +485,15 @@ async fn main() -> std::io::Result<()> {
     let pool = r2d2::Pool::new(manager).unwrap();
 
     HttpServer::new(move || {
+        let cors = Cors::default()
+                    .allowed_origin_fn(|origin, _req_head| {
+                        true
+                    })
+                    .allowed_methods(vec!["GET", "POST"])
+                    .allowed_headers(vec![header::AUTHORIZATION, header::ACCEPT])
+                    .allowed_header(header::CONTENT_TYPE)
+                    .supports_credentials()
+                    .max_age(3600);
         let secret_key = std::env::var("SECRET_KEY").expect("SECRET_KEY not set");
         let redis_host = std::env::var("REDIS_HOST").expect("REDIS_HOST not set");
         let redis_port = std::env::var("REDIS_PORT").expect("REDIS_PORT not set");
@@ -495,6 +506,7 @@ async fn main() -> std::io::Result<()> {
                 secret_key: secret_key,
                 redis: redis_client,
             }))
+            .wrap(cors)
             .service(get_all_levels)
             .service(get_all_ranks)
             .service(get_now_playing)
