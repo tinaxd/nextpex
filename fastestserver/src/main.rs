@@ -2,13 +2,15 @@ extern crate r2d2;
 extern crate r2d2_sqlite;
 
 use actix_web::web::Json;
-use actix_web::{error, get, web, App, HttpServer, Result};
+use actix_web::{error, get, post, web, App, HttpServer, Result};
 use derive_more::{Display, Error};
-use fastestserver::db::{
-    LevelUpdate, MonthlyCheck, PartialRankUpdate, PlayingNow, PlayingTime, RankUpdate,
+use fastestserver::db::{LevelUpdate, MonthlyCheck, PartialRankUpdate, PlayingNow, PlayingTime};
+use fastestserver::types::{
+    AllLevelResponse, AllRankResponse, InsertRequest, LevelResponse, RankResponse,
 };
-use fastestserver::types::{AllLevelResponse, AllRankResponse, LevelResponse, RankResponse};
+use r2d2::PooledConnection;
 use r2d2_sqlite::SqliteConnectionManager;
+use rusqlite::params;
 use serde;
 
 #[derive(Debug, Clone)]
@@ -197,10 +199,28 @@ async fn get_monthly_playing_time(data: web::Data<AppState>) -> Result<Json<Vec<
     Ok(web::Json(iter.map(|x| x.unwrap()).collect()))
 }
 
-type DBPool = r2d2::Pool<SqliteConnectionManager>;
+// type DBPool = r2d2::Pool<SqliteConnectionManager>;
 
-async fn get_username_from_ingamename(pool: &DBPool, in_game_name: &str) -> Result<Option<String>> {
-    let db = pool.get().map_err(conv_db_err)?;
+// trait DBConnLike {
+//     fn get_conn(self) -> Result<&PooledConnection<SqliteConnectionManager>>;
+// }
+
+// impl DBConnLike for DBPool {
+//     fn get_conn(self) -> Result<&'a PooledConnection<SqliteConnectionManager>> {
+//         self.get().map_err(conv_db_err)
+//     }
+// }
+
+// impl <'a> DBConnLike for &'a PooledConnection<SqliteConnectionManager> {
+//     fn get_conn(self) -> Result<&'a PooledConnection<SqliteConnectionManager>> {
+//         Ok(self)
+//     }
+// }
+
+async fn get_username_from_ingamename(
+    db: &PooledConnection<SqliteConnectionManager>,
+    in_game_name: &str,
+) -> Result<Option<String>> {
     let mut stmt = db
         .prepare("select username from ingamename where ingamename=?")
         .map_err(conv_db_err)?;
@@ -211,6 +231,74 @@ async fn get_username_from_ingamename(pool: &DBPool, in_game_name: &str) -> Resu
     match row {
         Some(row) => Ok(Some(row.unwrap())),
         None => Ok(None),
+    }
+}
+
+#[post("/check")]
+async fn insert_check(data: web::Data<AppState>, req: web::Json<InsertRequest>) -> Result<String> {
+    let mut db = data.pool.get().map_err(conv_db_err)?;
+
+    let username = get_username_from_ingamename(&db, &req.in_game_name).await?;
+    let username = match username {
+        None => return Err(error::ErrorNotFound("in-game name not found")),
+        Some(username) => username,
+    };
+    match req.r#type.as_str() {
+        "start" => {
+            let tx = db.transaction().map_err(conv_db_err)?;
+            tx.execute(
+                "insert into playingnow (username,gamename,startedat) values (?,?,?) ON CONFLICT(username) DO UPDATE SET gamename=?,startedat=?", params![&username, &req.game_name, &req.time, &req.game_name, &req.time]).map_err(conv_db_err)?;
+
+            tx.commit().map_err(conv_db_err)?;
+            return Ok("".to_string());
+        }
+        "stop" => {
+            let tx = db.transaction().map_err(conv_db_err)?;
+
+            let (gamename, started_at) = {
+                // retrive start info from playingnow table
+                let mut stmt = tx
+                    .prepare("select gamename,startedat from playingnow where username=?")
+                    .map_err(conv_db_err)?;
+                let mut rows = stmt
+                    .query_map([&username], |row| {
+                        Ok((row.get_unwrap(0), row.get_unwrap(1)))
+                    })
+                    .map_err(conv_db_err)?;
+                match rows.next() {
+                    Some(row) => row.unwrap(),
+                    None => return Err(error::ErrorNotFound("start entry not found")),
+                }
+            };
+
+            let gamename: String = gamename;
+            let started_at: i32 = started_at;
+
+            // if game names do not match, reject the request
+            if gamename != req.game_name {
+                return Err(error::ErrorBadRequest(
+                    "game name does not match with start info",
+                ));
+            }
+
+            // delete from playingnow table
+            tx.execute("delete from playingnow where username=?", params![username])
+                .map_err(conv_db_err)?;
+
+            // insert into playingtime table
+            tx.execute(
+                "insert into playingtime (username,gamename,startedat,endedat) values (?,?,?,?)",
+                params![username, req.game_name, started_at, req.time],
+            )
+            .map_err(conv_db_err)?;
+
+            tx.commit().map_err(conv_db_err)?;
+
+            return Ok("".to_string());
+        }
+        _ => {
+            return Err(error::ErrorBadRequest("type must be 'start' or 'stop"));
+        }
     }
 }
 
