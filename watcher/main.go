@@ -80,7 +80,9 @@ func compare(old models.UserData, new models.ApexStats) (bool, *[]models.Discord
 		models.PostRank(old.Uid, "arena", old.Stats.ArenaRank.Int32, arenaRank)
 	}
 
-	messageField[len(messageField)-1].Value += fmt.Sprintf("\n\n [グラフを見る](https://nextpex.tinax.work/)")
+	if hasUpdate {
+		messageField[len(messageField)-1].Value += fmt.Sprintf("\n\n [グラフを見る](https://nextpex.tinax.work/)")
+	}
 
 	userDataDetail := models.UserDataDetail{Level: sql.NullInt32{Int32: level}, TrioRank: sql.NullInt32{Int32: trioRank}, ArenaRank: sql.NullInt32{Int32: arenaRank}}
 
