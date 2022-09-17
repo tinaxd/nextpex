@@ -25,7 +25,7 @@ type rank struct {
 	RankType    string `json:"rank_type"`
 }
 
-func PostLevel(e *Environments, userID string, oldLevel, newLevel int32) {
+func PostLevel(userID string, oldLevel, newLevel int32) {
 	timestamp := time.Now().Unix()
 	jsonData, _ := json.Marshal(level{
 		PlayerName: userID,
@@ -43,7 +43,7 @@ func PostLevel(e *Environments, userID string, oldLevel, newLevel int32) {
 	}
 }
 
-func PostRank(e *Environments, userID, rankType string, oldRank, newRank int32) {
+func PostRank(userID, rankType string, oldRank, newRank int32) {
 	timestamp := time.Now().Unix()
 	jsonData, _ := json.Marshal(rank{
 		PlayerName:  userID,

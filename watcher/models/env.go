@@ -8,20 +8,14 @@ import (
 )
 
 type Environments struct {
-	APEX_API_ENDPOINT  string
-	APEX_API_KEY       string
-	DISCORD_ENDPOINT   string
-	TINAX_API_ENDPOINT string
-	BRONZE_BADGE       string
-	SILVER_BADGE       string
-	GOLD_BADGE         string
-	PLATINUM_BADGE     string
-	DIAMOND_BADGE      string
-	MARIADB_HOST       string
-	MARIADB_USER       string
-	MARIADB_PASSWORD   string
-	MARIADB_PORT       string
-	MARIADB_DATABASE   string
+	ApexApiEndpoint string
+	ApexApiKey      string
+	DiscordEndpoint string
+	BronzeBadge     string
+	SilverBadge     string
+	GoldBadge       string
+	PlatinumBadge   string
+	DiamondBadge    string
 }
 
 func LoadEnv(debug bool) Environments {
@@ -38,20 +32,14 @@ func LoadEnv(debug bool) Environments {
 	env := new(Environments)
 
 	// Load environment values
-	env.APEX_API_ENDPOINT = os.Getenv("API_ENDPOINT")
-	env.APEX_API_KEY = os.Getenv("API_KEY")
-	env.DISCORD_ENDPOINT = os.Getenv("DISCORD_ENDPOINT")
-	env.TINAX_API_ENDPOINT = os.Getenv("TINAX_API")
-	env.BRONZE_BADGE = os.Getenv("BRONZE_BADGE")
-	env.SILVER_BADGE = os.Getenv("SILVER_BADGE")
-	env.GOLD_BADGE = os.Getenv("GOLD_BADGE")
-	env.PLATINUM_BADGE = os.Getenv("PLATINUM_BADGE")
-	env.DIAMOND_BADGE = os.Getenv("DIAMOND_BADGE")
-	env.MARIADB_HOST = os.Getenv("MARIADB_HOST")
-	env.MARIADB_USER = os.Getenv("MARIADB_USER")
-	env.MARIADB_PASSWORD = os.Getenv("MARIADB_PASSWORD")
-	env.MARIADB_PORT = os.Getenv("MARIADB_PORT")
-	env.MARIADB_DATABASE = os.Getenv("MARIADB_DATABASE")
+	env.ApexApiEndpoint = os.Getenv("API_ENDPOINT")
+	env.ApexApiKey = os.Getenv("API_KEY")
+	env.DiscordEndpoint = os.Getenv("DISCORD_ENDPOINT")
+	env.BronzeBadge = os.Getenv("BRONZE_BADGE")
+	env.SilverBadge = os.Getenv("SILVER_BADGE")
+	env.GoldBadge = os.Getenv("GOLD_BADGE")
+	env.PlatinumBadge = os.Getenv("PLATINUM_BADGE")
+	env.DiamondBadge = os.Getenv("DIAMOND_BADGE")
 
 	return *env
 }

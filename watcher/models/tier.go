@@ -72,15 +72,15 @@ func GetTierBadge(env *Environments, rank int32, types string) string {
 	var badge string
 	switch {
 	case rank < getUpperLimit("bronze", types):
-		badge = env.BRONZE_BADGE
+		badge = env.BronzeBadge
 	case rank < getUpperLimit("silver", types):
-		badge = env.SILVER_BADGE
+		badge = env.SilverBadge
 	case rank < getUpperLimit("gold", types):
-		badge = env.GOLD_BADGE
+		badge = env.GoldBadge
 	case rank < getUpperLimit("platinum", types):
-		badge = env.PLATINUM_BADGE
+		badge = env.PlatinumBadge
 	default:
-		badge = env.DIAMOND_BADGE
+		badge = env.DiamondBadge
 	}
 
 	return badge

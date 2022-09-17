@@ -67,17 +67,17 @@ func compare(old models.UserData, new models.ApexStats) (bool, *[]models.Discord
 	if timestamp > old.LastUpdate.Int64 && int32(new.Data.Segments[0].Stats.Level.Value) > old.Stats.Level.Int32 {
 		hasUpdate = true
 		messageField = append(messageField, models.DiscordField{Name: "レベル", Value: fmt.Sprint(old.Stats.Level.Int32) + "→" + fmt.Sprint(level) + rankDiff(old.Stats.Level.Int32, level) + ":laughing:", Inline: false})
-		models.PostLevel(&envs, old.Uid, old.Stats.Level.Int32, level)
+		models.PostLevel(old.Uid, old.Stats.Level.Int32, level)
 	}
 	if timestamp > old.LastUpdate.Int64 && int32(new.Data.Segments[0].Stats.RankScore.Value) != old.Stats.TrioRank.Int32 {
 		hasUpdate = true
 		messageField = append(messageField, models.DiscordField{Name: "トリオRank", Value: models.GetTierBadge(&envs, old.Stats.TrioRank.Int32, "trio") + fmt.Sprint(old.Stats.TrioRank.Int32) + "→" + models.GetTierBadge(&envs, trioRank, "trio") + fmt.Sprint(trioRank) + rankDiff(old.Stats.TrioRank.Int32, trioRank), Inline: false})
-		models.PostRank(&envs, old.Uid, "trio", old.Stats.TrioRank.Int32, trioRank)
+		models.PostRank(old.Uid, "trio", old.Stats.TrioRank.Int32, trioRank)
 	}
 	if timestamp > old.LastUpdate.Int64 && int32(new.Data.Segments[0].Stats.ArenaRankScore.Value) != old.Stats.ArenaRank.Int32 {
 		hasUpdate = true
 		messageField = append(messageField, models.DiscordField{Name: "アリーナRank", Value: models.GetTierBadge(&envs, old.Stats.ArenaRank.Int32, "arena") + fmt.Sprint(old.Stats.ArenaRank.Int32) + "→" + models.GetTierBadge(&envs, arenaRank, "arena") + fmt.Sprint(arenaRank) + rankDiff(old.Stats.ArenaRank.Int32, arenaRank), Inline: false})
-		models.PostRank(&envs, old.Uid, "arena", old.Stats.ArenaRank.Int32, arenaRank)
+		models.PostRank(old.Uid, "arena", old.Stats.ArenaRank.Int32, arenaRank)
 	}
 
 	userDataDetail := models.UserDataDetail{Level: sql.NullInt32{Int32: level}, TrioRank: sql.NullInt32{Int32: trioRank}, ArenaRank: sql.NullInt32{Int32: arenaRank}}
@@ -90,7 +90,7 @@ func updateStats(db *sql.DB, userList []models.UserData) {
 		fmt.Printf("Old: %+v\n", v)
 
 		// Create go routine
-		apexStats := models.GetApexStats(envs.APEX_API_ENDPOINT, envs.APEX_API_KEY, v.Platform, v.Uid)
+		apexStats := models.GetApexStats(envs.ApexApiEndpoint, envs.ApexApiKey, v.Platform, v.Uid)
 
 		if apexStats == nil {
 			log.Printf("error fetching: %s", v.Uid)
@@ -114,7 +114,7 @@ func updateStats(db *sql.DB, userList []models.UserData) {
 					Fields: *messageField,
 				},
 			}
-			models.SendMessage(envs.DISCORD_ENDPOINT, msgObj)
+			models.SendMessage(envs.DiscordEndpoint, msgObj)
 		}
 	}
 }
