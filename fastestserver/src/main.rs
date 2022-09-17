@@ -268,6 +268,20 @@ async fn get_username_from_ingamename(
     }
 }
 
+async fn game_existence_check(
+    db: &PooledConnection<SqliteConnectionManager>,
+    game_name: &str,
+) -> Result<bool> {
+    let mut stmt = db
+        .prepare("select gamename from game where gamename=?")
+        .map_err(conv_db_err)?;
+    let mut rows = stmt
+        .query_map([game_name], |row| Ok(row.get_unwrap::<usize, String>(0)))
+        .map_err(conv_db_err)?;
+    let row = rows.next();
+    Ok(row.is_some())
+}
+
 #[post("/check")]
 async fn insert_check(data: web::Data<AppState>, req: web::Json<InsertRequest>) -> Result<String> {
     let mut db = data.pool.get().map_err(conv_db_err)?;
@@ -279,6 +293,9 @@ async fn insert_check(data: web::Data<AppState>, req: web::Json<InsertRequest>) 
     };
     match req.r#type.as_str() {
         "start" => {
+            if !game_existence_check(&db, &req.game_name).await? {
+                return Err(error::ErrorNotFound("game not found"));
+            }
             let tx = db.transaction().map_err(conv_db_err)?;
             tx.execute(
                 "insert into playingnow (username,gamename,startedat) values (?,?,?) ON CONFLICT(username) DO UPDATE SET gamename=?,startedat=?", params![&username, &req.game_name, &req.time, &req.game_name, &req.time]).map_err(conv_db_err)?;
@@ -287,6 +304,10 @@ async fn insert_check(data: web::Data<AppState>, req: web::Json<InsertRequest>) 
             return Ok("".to_string());
         }
         "stop" => {
+            if !game_existence_check(&db, &req.game_name).await? {
+                return Err(error::ErrorNotFound("game not found"));
+            }
+
             let tx = db.transaction().map_err(conv_db_err)?;
 
             let (gamename, started_at) = {
