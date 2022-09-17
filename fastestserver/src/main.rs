@@ -197,6 +197,23 @@ async fn get_monthly_playing_time(data: web::Data<AppState>) -> Result<Json<Vec<
     Ok(web::Json(iter.map(|x| x.unwrap()).collect()))
 }
 
+type DBPool = r2d2::Pool<SqliteConnectionManager>;
+
+async fn get_username_from_ingamename(pool: &DBPool, in_game_name: &str) -> Result<Option<String>> {
+    let db = pool.get().map_err(conv_db_err)?;
+    let mut stmt = db
+        .prepare("select username from ingamename where ingamename=?")
+        .map_err(conv_db_err)?;
+    let mut rows = stmt
+        .query_map([in_game_name], |row| Ok(row.get_unwrap(0)))
+        .map_err(conv_db_err)?;
+    let row = rows.next();
+    match row {
+        Some(row) => Ok(Some(row.unwrap())),
+        None => Ok(None),
+    }
+}
+
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     let manager = SqliteConnectionManager::file("db.sqlite3");
@@ -208,6 +225,8 @@ async fn main() -> std::io::Result<()> {
             .service(get_all_levels)
             .service(get_all_ranks)
             .service(get_now_playing)
+            .service(get_latest_game_sessions)
+            .service(get_monthly_playing_time)
     })
     .bind(("127.0.0.1", 9000))?
     .run()
