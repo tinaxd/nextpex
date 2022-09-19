@@ -231,33 +231,74 @@ struct NextpexCheckRequest {
     game_name: String,
 }
 
+async fn is_checked_game(
+    conn: &mut redis::aio::Connection,
+    gamename: &str,
+) -> Result<bool, String> {
+    let result = conn
+        .sismember("checked_games", gamename)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(result)
+}
+
 impl Handler {
     async fn send_game_notification(
         &self,
         member: &mut serenity::model::guild::Member,
         ctx: &Context,
         event: &GameEvent,
-    ) -> serenity::Result<()> {
+    ) -> Result<(), String> {
         let guild = &member.guild_id;
-        let chan = find_channel(ctx, guild, "apexability-check").await?;
+        let chan = find_channel(ctx, guild, "apexability-check")
+            .await
+            .map_err(|e| e.to_string())?;
         if let Some(chan) = chan {
-            let (tail, game, on) = match event {
-                GameEvent::Start(game) => (format!("{} を始めました！", game), game, true),
-                GameEvent::End(game) => (format!("{} をやめました！", game), game, false),
-            };
-            let content = format!("{} が {}", member.display_name(), tail);
-            chan.say(&ctx.http, content).await?;
+            let mut conn = self
+                .redis
+                .get_async_connection()
+                .await
+                .map_err(|e| e.to_string())?;
+            if let Some((tail, game, on)) = match event {
+                GameEvent::Start(game) => {
+                    if is_checked_game(&mut conn, game)
+                        .await
+                        .map_err(|e| e.to_string())?
+                    {
+                        Some((format!("{} を始めました！", game), game, true))
+                    } else {
+                        None
+                    }
+                }
+                GameEvent::End(game) => {
+                    if is_checked_game(&mut conn, game)
+                        .await
+                        .map_err(|e| e.to_string())?
+                    {
+                        Some((format!("{} をやめました！", game), game, false))
+                    } else {
+                        None
+                    }
+                }
+            } {
+                let content = format!("{} が {}", member.display_name(), tail);
+                chan.say(&ctx.http, content)
+                    .await
+                    .map_err(|e| e.to_string())?;
 
-            if game == "Apex Legends" {
-                apex_role_change(ctx, member, on).await?;
+                if game == "Apex Legends" {
+                    apex_role_change(ctx, member, on)
+                        .await
+                        .map_err(|e| e.to_string())?;
+                }
+
+                let member_name = &member.display_name();
+                let is_start = on;
+                let game_name = game;
+                let time = chrono::Local::now();
+                self.nextpex_apexability(member_name, is_start, game_name, &time)
+                    .await;
             }
-
-            let member_name = &member.display_name();
-            let is_start = on;
-            let game_name = game;
-            let time = chrono::Local::now();
-            self.nextpex_apexability(member_name, is_start, game_name, &time)
-                .await;
         }
 
         Ok(())
