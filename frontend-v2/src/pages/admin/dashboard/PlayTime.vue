@@ -3,7 +3,7 @@
     <va-card-title>
       <h1>プレイ時間 (hours)</h1>
       <va-chip outline disabled class="mb-2 mr-2" color="primary" style="opacity: 1"
-        >{{ yearMonth[activePage] }}月の合計プレイ時間</va-chip
+        >{{ yearMonth[activePage-1] }}月の合計プレイ時間</va-chip
       >
     </va-card-title>
     <va-card-content>
