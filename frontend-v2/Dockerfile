@@ -1,13 +1,14 @@
-FROM node:14
+FROM node:lts AS builder
 
-WORKDIR /app
+WORKDIR /usr/src/app
 
-COPY . /app
+COPY package.json package-lock.json /usr/src/app/
+RUN npm install
 
-EXPOSE 8080
+ENV NODE_ENV=production
+COPY . /usr/src/app/
+RUN npm run build
 
-RUN npm install http-server -g
+FROM httpd:alpine
 
-RUN npm install --no-optional && npm run build
-
-CMD http-server ./dist
+COPY --from=builder /usr/src/app/dist /usr/local/apache2/htdocs/

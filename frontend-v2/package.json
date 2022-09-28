@@ -4,7 +4,7 @@
   "version": "3.1.0",
   "scripts": {
     "dev": "vite",
-    "build": "npm run lint && vue-tsc --noEmit && vite build",
+    "build": "vite build",
     "build:ci": "vite build",
     "prelint": "npm run format",
     "format": "prettier --write ."
