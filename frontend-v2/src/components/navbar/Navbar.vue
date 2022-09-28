@@ -3,12 +3,12 @@
     <va-navbar>
       <template #left>
         <div class="left">
-          <va-icon-menu-collapsed
-            :class="{ 'x-flip': isSidebarMinimized }"
-            class="va-navbar__item"
-            :color="colors.primary"
-            @click="isSidebarMinimized = !isSidebarMinimized"
-          />
+<!--          <va-icon-menu-collapsed-->
+<!--            :class="{ 'x-flip': isSidebarMinimized }"-->
+<!--            class="va-navbar__item"-->
+<!--            :color="colors.primary"-->
+<!--            @click="isSidebarMinimized = !isSidebarMinimized"-->
+<!--          />-->
           <router-link to="/">
             <vuestic-logo class="logo" />
           </router-link>
