@@ -1,16 +1,19 @@
 <template>
   <va-card class="d-flex">
     <va-card-title>
-      <h1>プレイ時間 (hours)</h1>
-      <va-chip outline disabled class="mb-2 mr-2" color="primary" style="opacity: 1"
-        >{{ yearMonth[activePage-1] }}月の合計プレイ時間</va-chip
-      >
+      <div class="row">
+        <div class="flex xs4">
+          <h1>プレイ時間 (hours)</h1>
+        </div>
+        <div class="flex xs4 offset--xs4">
+          <Datepicker v-model="selectedMonth" monthPicker autoApply showNowButton/>
+        </div>
+      </div>
+<!--      <h1>プレイ時間 (hours)</h1>-->
+<!--      <Datepicker v-model="selectedMonth" monthPicker autoApply showNowButton/>-->
     </va-card-title>
     <va-card-content>
       <Bar ref="scatter" :chart-data="chartInput" :chart-options="chartOptions" />
-      <div class="flex-center my-3">
-        <va-pagination v-model="activePage" :visible-pages="4" :pages="yearMonth.length" />
-      </div>
     </va-card-content>
   </va-card>
 </template>
@@ -35,14 +38,18 @@
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           backgroundColor: (context: any) => string
         }[],
-        activePage: 1,
         yearMonth: [] as string[],
         playTimeByYearMonth: new Map<string, PlayTimeEntry[]>(),
+        selectedMonth:{
+          month: new Date().getMonth(),
+          year: new Date().getFullYear()
+        }
       }
     },
     computed: {
       chartInput() {
-        const yearMonth = this.yearMonth[this.activePage - 1]
+        const idx = this.yearMonth.findIndex((v) => v === `${this.selectedMonth.year}-${this.selectedMonth.month+1}`)
+        const yearMonth = this.yearMonth[idx]
         const playTimeEntry = this.playTimeByYearMonth.get(yearMonth)
         const gameNames = new Set<string>()
         playTimeEntry?.forEach((entry) => {
@@ -87,9 +94,6 @@
           }
         })
 
-        // get sum of games per user
-        console.log('+', datasets)
-
         return {
           datasets: datasets,
           labels: allUserNameArray,
@@ -103,17 +107,9 @@
           indexAxis: 'y',
           scales: {
             x: {
-              scaleLabel: {
-                display: true,
-                labelString: 'プレイ時間 (時間)',
-              },
               stacked: true,
             },
             y: {
-              scaleLabel: {
-                display: true,
-                labelString: 'プレイ時間 (時間)',
-              },
               stacked: true,
             },
           },
@@ -128,7 +124,6 @@
       async fetchPlayTime() {
         const response = await axios.get('/check/monthly')
         const playTimes = response.data
-        console.log(playTimes)
         const yearMonth = new Set()
         const playTimeByYearMonth = new Map()
         for (const playTime of playTimes) {
