@@ -2,10 +2,10 @@
   <va-card class="d-flex">
     <va-card-title>
       <div class="row">
-        <div class="flex xs4">
+        <div class="flex xs6 xl6">
           <h1>プレイ時間 (hours)</h1>
         </div>
-        <div class="flex xs4 offset--xs4">
+        <div class="flex xs6 xl6">
           <Datepicker v-model="selectedMonth" monthPicker autoApply showNowButton/>
         </div>
       </div>
