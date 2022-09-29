@@ -24,6 +24,16 @@ services:
     profiles:
       - frontend
 
+  frontend-v2:
+    build: ./frontend-v2
+    restart: always
+    ports:
+      - "3600:80"
+    depends_on:
+      - api
+    profiles:
+      - frontend-v2
+
   redis:
     image: redis:latest
     volumes:
