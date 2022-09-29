@@ -9,6 +9,7 @@
     ref="scatter"
     :chart-data="chartInput"
     :chart-options="(chartOptions as any)"
+    :plugins="plugins"
     @mousedown="setCursorPosition"
     @mouseup="resetDragZoom"
   />
@@ -16,7 +17,7 @@
 
 <script lang="ts">
   import { defineComponent } from 'vue'
-  import { registerables, Chart as ChartJS } from 'chart.js'
+  import {registerables, Chart} from 'chart.js'
   import zoomPlugin from 'chartjs-plugin-zoom'
   import axios from 'axios'
   import { shadeColor } from '../color'
@@ -35,6 +36,7 @@
           backgroundColor: (ctx: any) => string
         }[],
         clickPosition: [0, 0] as [number, number],
+        plugin :[]
       }
     },
     computed: {
@@ -95,14 +97,80 @@
           },
         }
       },
+      plugins() {
+        return [{
+          id: "rankArenaPlugin",
+          beforeDraw: (chart) => {
+            const yScale = chart.scales['y'];
+            const xScale = chart.scales['xAxis'];
+            const ctx = chart.ctx;
+
+            let areas: (string | number)[][] = [];
+            switch (this.$props.rankType) {
+              case 'trio':
+                areas = [
+                  [0, 1000, "#d0b49e"],
+                  [1000, 3000,"#c89f8e"],
+                  [3000, 5400, "#e3e4ef"],
+                  [5400, 8200, "rgba(254,241,174,0.84)"],
+                  [8200, 11400, "rgba(117,255,253,0.8)"],
+                  [11400, 15000, "rgba(42,187,254,0.58)"],
+                  [15000, 20000, "rgba(166,99,255,0.6)"],
+                ];
+                break;
+              case 'arena':
+                areas = [
+                  [0, 1600,"#c89f8e"],
+                  [1600, 3200, "#e3e4ef"],
+                  [3200, 4800, "rgba(254,241,174,0.84)"],
+                  [4800, 6400, "rgba(117,255,253,0.8)"],
+                  [6400, 8000, "rgba(42,187,254,0.58)"],
+                  [8000, 20000, "rgba(166,99,255,0.6)"],
+                ];
+                break;
+            }
+
+            for (const area of areas) {
+              const left = xScale.left;
+              const width = xScale.width;
+              let adjust = 0;
+              let top = yScale.getPixelForValue(area[1]);
+              if (top < yScale.top) {
+                top = yScale.top;
+                adjust++;
+              } else if (top > yScale.bottom) {
+                continue;
+              }
+              let bottom = yScale.getPixelForValue(area[0]);
+              if (bottom > yScale.bottom) {
+                bottom = yScale.bottom;
+                adjust++;
+              } else if (bottom < yScale.top) {
+                continue;
+              }
+
+              if (adjust >= 2) {
+                continue;
+              }
+
+              const height = bottom - top;
+
+              ctx.fillStyle = area[2];
+              ctx.fillRect(left, top, width, height);
+            }
+          },
+        }]
+      }
     },
     watch: {
       rankType() {
-        this.fetchRanks()
+        this.fetchRanks().then(() => {
+          (this.$refs.scatter as any).updateChart()
+        })
       },
     },
     mounted() {
-      ChartJS.register(zoomPlugin, ...registerables)
+      Chart.register(zoomPlugin, ...registerables)
       this.fetchRanks()
     },
     methods: {

@@ -3,7 +3,7 @@
   <Scatter
     ref="scatter"
     :chart-data="chartInput"
-    :chart-options="chartOptions as any"
+    :chart-options="chartOptions"
     @mousedown="setCursorPosition"
     @mouseup="resetDragZoom"
   />
