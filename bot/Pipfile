@@ -6,10 +6,12 @@ name = "pypi"
 [packages]
 "discord.py" = "*"
 requests = "*"
+sqlalchemy = "*"
 
 [dev-packages]
 mypy = "*"
 types-requests = "*"
+black = "*"
 
 [requires]
 python_version = "3"
