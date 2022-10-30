@@ -2,12 +2,11 @@ extern crate actix_web;
 extern crate env_logger;
 extern crate r2d2;
 extern crate r2d2_sqlite;
-extern crate redis;
 
+use actix_cors::Cors;
+use actix_web::http::header;
 use actix_web::web::Json;
 use actix_web::{error, get, post, web, App, HttpRequest, HttpServer, Result};
-use actix_web::http::header;
-use actix_cors::Cors;
 use derive_more::{Display, Error};
 use fastestserver::db::{LevelUpdate, MonthlyCheck, PartialRankUpdate, PlayingNow, PlayingTime};
 use fastestserver::types::{
@@ -16,8 +15,6 @@ use fastestserver::types::{
 };
 use r2d2::PooledConnection;
 use r2d2_sqlite::SqliteConnectionManager;
-#[allow(unused_imports)]
-use redis::AsyncCommands;
 use rusqlite::params;
 use serde;
 
@@ -25,7 +22,7 @@ use serde;
 struct AppState {
     pool: r2d2::Pool<SqliteConnectionManager>,
     secret_key: String,
-    redis: redis::Client,
+    bot_conn: (String, i32),
 }
 
 #[derive(Debug, Display, Error)]
@@ -425,8 +422,24 @@ fn validate_secret(req: &HttpRequest, data: &web::Data<AppState>) -> Result<()> 
     }
 }
 
-fn conv_redis_err<T>(_err: T) -> error::Error {
-    error::ErrorInternalServerError("redis error")
+fn conv_zmq_err<T>(_err: T) -> error::Error {
+    error::ErrorInternalServerError("internal IPC error")
+}
+
+fn make_requester(zmq_conn: &(String, i32)) -> Result<zmq::Socket> {
+    let context = zmq::Context::new();
+    let requester = context.socket(zmq::REQ).unwrap();
+
+    let conn = format!("tcp://{}:{}", zmq_conn.0, zmq_conn.1);
+
+    conv_zmq_err(requester.connect(&conn))
+}
+
+fn validate_zmq_response(msg: &zmq::Message) -> bool {
+    match msg.as_str() {
+        None => false,
+        Some(s) => s == "ok",
+    }
 }
 
 #[post("/minecraft/joined")]
@@ -437,18 +450,21 @@ async fn minecraft_joined(
 ) -> Result<String> {
     validate_secret(&req, &data)?;
 
-    let mut conn = data
-        .redis
-        .get_async_connection()
-        .await
-        .map_err(conv_redis_err)?;
+    let requester = make_requester(&data.bot_conn)?;
+    let mut msg = zmq::Message::new();
 
-    redis::pipe()
-        .sadd("mc_players", &body.username)
-        .lpush("mc_event", format!("connected:{}", &body.username))
-        .query_async(&mut conn)
-        .await
-        .map_err(conv_redis_err)?;
+    let mut db = data.pool.get().map_err(conv_db_err)?;
+    let mut stmt =
+        db.prepare("insert into minecraft_players(playername) VALUES(?) ON CONFLICT DO NOTHING")?;
+    stmt.execute([&body.0.username])?;
+
+    match requester.send(format!("connected:{}", &body.0.username)) {
+        Err(e) => {
+            eprintln!("zmq error: {:?}", &e);
+            return Err(conv_zmq_err(&e));
+        }
+        _ => {}
+    }
 
     Ok("".to_string())
 }
@@ -465,14 +481,14 @@ async fn minecraft_left(
         .redis
         .get_async_connection()
         .await
-        .map_err(conv_redis_err)?;
+        .map_err(conv_zmq_err)?;
 
     redis::pipe()
         .srem("mc_players", &body.username)
         .lpush("mc_event", format!("disconnected:{}", &body.username))
         .query_async(&mut conn)
         .await
-        .map_err(conv_redis_err)?;
+        .map_err(conv_zmq_err)?;
 
     Ok("".to_string())
 }
@@ -486,25 +502,25 @@ async fn main() -> std::io::Result<()> {
 
     HttpServer::new(move || {
         let cors = Cors::default()
-                    .allowed_origin_fn(|origin, _req_head| {
-                        true
-                    })
-                    .allowed_methods(vec!["GET", "POST"])
-                    .allowed_headers(vec![header::AUTHORIZATION, header::ACCEPT])
-                    .allowed_header(header::CONTENT_TYPE)
-                    .supports_credentials()
-                    .max_age(3600);
+            .allowed_origin_fn(|origin, _req_head| true)
+            .allowed_methods(vec!["GET", "POST"])
+            .allowed_headers(vec![header::AUTHORIZATION, header::ACCEPT])
+            .allowed_header(header::CONTENT_TYPE)
+            .supports_credentials()
+            .max_age(3600);
         let secret_key = std::env::var("SECRET_KEY").expect("SECRET_KEY not set");
-        let redis_host = std::env::var("REDIS_HOST").expect("REDIS_HOST not set");
-        let redis_port = std::env::var("REDIS_PORT").expect("REDIS_PORT not set");
 
-        let redis_connstr = format!("redis://{}:{}", redis_host, redis_port);
-        let redis_client = redis::Client::open(redis_connstr).expect("could not connect to redis");
+        let bot_addr = std::env::var("BOT_ADDR").expect("BOT_ADDR not set");
+        let bot_port = std::env::var("BOT_PORT")
+            .expect("BOT_PORT not set")
+            .parse::<i32>()
+            .expect("BOT_PORT is not integer");
+
         App::new()
             .app_data(web::Data::new(AppState {
                 pool: pool.clone(),
-                secret_key: secret_key,
-                redis: redis_client,
+                secret_key,
+                bot_conn: (bot_addr, bot_port),
             }))
             .wrap(cors)
             .service(get_all_levels)
