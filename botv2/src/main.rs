@@ -1,3 +1,5 @@
+extern crate r2d2;
+extern crate r2d2_sqlite;
 extern crate reqwest;
 extern crate serde;
 extern crate serde_json;
@@ -10,6 +12,9 @@ use std::env;
 use std::sync::Arc;
 
 use chrono::TimeZone;
+use r2d2::PooledConnection;
+use r2d2_sqlite::SqliteConnectionManager;
+use rusqlite::params;
 use serenity::async_trait;
 use serenity::framework::StandardFramework;
 use serenity::model;
@@ -21,84 +26,80 @@ use serenity::prelude::*;
 
 struct Handler {
     web_api: String,
-    redis: redis::Client,
+    pool: r2d2::Pool<SqliteConnectionManager>,
     watching_msg:
         Arc<Mutex<RefCell<HashMap<serenity::model::id::GuildId, serenity::model::id::MessageId>>>>,
 }
 
-type RedisResult<T> = std::result::Result<T, redis::RedisError>;
+type DBResult<T> = rusqlite::Result<T>;
 
-async fn get_players_from_redis(conn: &mut redis::aio::Connection) -> RedisResult<Vec<String>> {
-    match conn.smembers("mc_players").await {
-        Err(e) => Err(e),
-        Ok(players) => {
-            let mut players: Vec<String> = players;
-            players.sort();
-            Ok(players)
-        }
-    }
+type DBConnection = PooledConnection<SqliteConnectionManager>;
+
+fn get_players_from_db(conn: &DBConnection) -> DBResult<Vec<String>> {
+    let mut stmt = conn.prepare("select playername from minecraft_players sort by playername")?;
+    stmt.query_map([], |row| Ok(row.get_unwrap(0)))
+        .unwrap()
+        .collect()
 }
 
-async fn get_guild_ids(
-    conn: &mut redis::aio::Connection,
-) -> RedisResult<Vec<serenity::model::id::GuildId>> {
-    match conn.smembers("guild_ids").await {
-        Err(e) => Err(e),
-        Ok(guild_ids) => {
-            let mut guild_ids: Vec<u64> = guild_ids;
-            guild_ids.sort();
-            Ok(guild_ids
-                .iter()
-                .map(|x| serenity::model::id::GuildId(*x))
-                .collect())
-        }
-    }
+fn get_guild_ids(conn: &DBConnection) -> DBResult<Vec<serenity::model::id::GuildId>> {
+    let mut stmt = conn.prepare("select guildid from bot_build sort by guildid")?;
+    stmt.query_map([], |row| {
+        Ok({
+            let id = row.get_unwrap(0);
+            serenity::model::id::GuildId(id)
+        })
+    })
+    .unwrap()
+    .collect()
 }
 
-async fn clear_and_add_guild_ids(
-    conn: &mut redis::aio::Connection,
+fn clear_and_add_guild_ids(
+    conn: &mut DBConnection,
     guild_ids: impl std::iter::Iterator<Item = serenity::model::id::GuildId>,
-) -> RedisResult<()> {
-    let mut pipe = redis::pipe();
-    pipe.del("guild_ids");
-    println!("guild_ids cleared");
-    guild_ids.into_iter().for_each(|x| {
-        pipe.sadd("guild_ids", x.0);
-        println!("added guilds id {}", x.0);
-    });
-    pipe.query_async(conn).await?;
-    Ok(())
-}
+) -> DBResult<()> {
+    let tx = conn.transaction()?;
 
-async fn add_guild_id(
-    conn: &mut redis::aio::Connection,
-    guild_id: &serenity::model::id::GuildId,
-) -> RedisResult<()> {
-    conn.sadd("guild_ids", guild_id.0).await?;
-    println!("added guilds id {}", guild_id.0);
-    Ok(())
-}
+    tx.execute("delete from bot_guild where minecraft_channel is null", [])?;
 
-async fn get_target_channel(
-    conn: &mut redis::aio::Connection,
-    guild_id: &serenity::model::id::GuildId,
-) -> RedisResult<Option<serenity::model::id::ChannelId>> {
-    match conn.get(format!("mc_channel:{}", guild_id.0)).await {
-        Err(e) => Err(e),
-        Ok(channel_id) => match channel_id {
-            Some(channel_id) => Ok(Some(serenity::model::id::ChannelId(channel_id))),
-            None => Ok(None),
-        },
+    {
+        let mut stmt = tx.prepare("insert into bot_guild(guildid) VALUES(?)")?;
+        for x in guild_ids.into_iter() {
+            stmt.execute([x.0])?;
+            println!("added guilds id {}", x.0);
+        }
     }
+
+    tx.commit()?;
+    Ok(())
 }
 
-async fn set_target_channel(
-    conn: &mut redis::aio::Connection,
+fn add_guild_id(conn: &mut DBConnection, guild_id: &serenity::model::id::GuildId) -> DBResult<()> {
+    let mut stmt = conn.prepare("insert into bot_guild(guildid) VALUES(?)")?;
+    stmt.execute([guild_id.0])?;
+    Ok(())
+}
+
+fn get_target_channel(
+    conn: &mut DBConnection,
+    guild_id: &serenity::model::id::GuildId,
+) -> DBResult<Option<serenity::model::id::ChannelId>> {
+    let mut stmt = conn.prepare("select minecraft_channel from bot_guild where guildid=?")?;
+    let chan = stmt.query_row([guild_id.0], |row| {
+        let id = row.get_unwrap(0);
+        Ok(serenity::model::id::ChannelId(id))
+    })?;
+    Ok(Some(chan))
+}
+
+fn set_target_channel(
+    conn: &mut DBConnection,
     guild_id: &serenity::model::id::GuildId,
     channel_id: &serenity::model::id::ChannelId,
-) -> RedisResult<()> {
-    conn.set(format!("mc_channel:{}", guild_id.0), channel_id.0)
-        .await
+) -> DBResult<()> {
+    let mut stmt = conn.prepare("insert into bot_guild(guildid,minecraft_channel) VALUES(?,?) ON CONFLICT DO UPDATE SET minecraft_channel=?")?;
+    stmt.execute([guild_id.0, channel_id.0, channel_id.0])?;
+    Ok(())
 }
 
 fn build_message(players: &[String]) -> String {
@@ -118,11 +119,7 @@ enum EventParseResult {
     ValidMessage(String),
 }
 
-async fn process_event(
-    conn: &mut redis::aio::Connection,
-    ctx: &Context,
-    event: &str,
-) -> Result<(), String> {
+async fn process_event(conn: &mut DBConnection, ctx: &Context, event: &str) -> Result<(), String> {
     let split = event
         .split(":")
         .map(|s| s.to_owned())
@@ -147,9 +144,9 @@ async fn process_event(
             _ => UnknownEvent,
         } {
             ValidMessage(text) => {
-                let guild_ids = get_guild_ids(conn).await.map_err(|e| e.to_string())?;
+                let guild_ids = get_guild_ids(conn).map_err(|e| e.to_string())?;
                 for guild_id in guild_ids {
-                    match get_target_channel(conn, &guild_id).await {
+                    match get_target_channel(conn, &guild_id) {
                         Err(e) => return Err(e.to_string()),
                         Ok(channel_id) => match channel_id {
                             Some(channel_id) => {
@@ -173,14 +170,33 @@ async fn process_event(
     }
 }
 
-async fn redis_loop(mut conn: redis::aio::Connection, ctx: Context) {
+async fn redis_loop(mut conn: DBConnection, ctx: Context) {
+    let (tx, mut rx) = tokio::sync::mpsc::channel::<String>(10);
+
+    tokio::task::spawn_blocking(move || {
+        let context = zmq::Context::new();
+        let responder = context.socket(zmq::REP).unwrap();
+
+        assert!(responder.bind("tcp://*:5000").is_ok());
+        println!("listening mc_events on zmq tcp:5000 REP");
+
+        let mut msg = zmq::Message::new();
+        responder.recv(&mut msg, 0).unwrap();
+        responder.send("ok", 0).unwrap();
+
+        match msg.as_str() {
+            None => println!("error: {:?}", &msg),
+            Some(event) => {
+                tx.blocking_send(event.to_owned())
+                    .expect("failed to send over tx");
+            }
+        }
+    });
+
     loop {
-        let event = conn.brpop("mc_event", 0).await;
-        match event {
-            Err(e) => println!("Error: {}", e),
-            Ok(event) => {
-                let event: (String, String) = event;
-                let event = event.1;
+        match rx.recv().await {
+            None => eprintln!("recv error"),
+            Some(event) => {
                 if let Err(e) = process_event(&mut conn, &ctx, &event).await {
                     println!("Error: {}", e);
                 }
@@ -228,15 +244,14 @@ struct NextpexCheckRequest {
     game_name: String,
 }
 
-async fn is_checked_game(
-    conn: &mut redis::aio::Connection,
-    gamename: &str,
-) -> Result<bool, String> {
-    let result = conn
-        .sismember("checked_games", gamename)
-        .await
-        .map_err(|e| e.to_string())?;
-    Ok(result)
+async fn is_checked_game(conn: &mut DBConnection, gamename: &str) -> DBResult<bool> {
+    let mut stmt = conn.prepare("select is_checked from game where gamename=?")?;
+    let checked = stmt.query_row([gamename], |row| row.get::<usize, bool>(0));
+    match checked {
+        Err(rusqlite::Error::QueryReturnedNoRows) => Ok(false),
+        Ok(checked) => Ok(checked),
+        Err(e) => Err(e),
+    }
 }
 
 impl Handler {
@@ -251,11 +266,7 @@ impl Handler {
             .await
             .map_err(|e| e.to_string())?;
         if let Some(chan) = chan {
-            let mut conn = self
-                .redis
-                .get_async_connection()
-                .await
-                .map_err(|e| e.to_string())?;
+            let mut conn = self.pool.get().map_err(|e| e.to_string())?;
             if let Some((tail, game, on)) = match event {
                 GameEvent::Start(game) => {
                     if is_checked_game(&mut conn, game)
@@ -462,9 +473,9 @@ impl EventHandler for Handler {
             // authentication error, or lack of permissions to post in the
             // channel, so log to stdout when some error happens, with a
             // description of it.
-            match self.redis.get_async_connection().await {
+            match self.pool.get() {
                 Ok(mut conn) => {
-                    let players = get_players_from_redis(&mut conn).await;
+                    let players = get_players_from_db(&mut conn);
                     match players {
                         Err(e) => println!("Error: {:?}", e),
                         Ok(players) => {
@@ -478,13 +489,12 @@ impl EventHandler for Handler {
                 Err(e) => println!("RedisError: {:?}", e),
             }
         } else if content == "set" {
-            match self.redis.get_async_connection().await {
+            match self.pool.get() {
                 Err(e) => println!("RedisError: {:?}", e),
                 Ok(mut conn) => {
                     if let Some(guild_id) = msg.guild_id {
                         let channel_id = msg.channel_id;
-                        if let Err(e) = set_target_channel(&mut conn, &guild_id, &channel_id).await
-                        {
+                        if let Err(e) = set_target_channel(&mut conn, &guild_id, &channel_id) {
                             println!("Error set_target_channel: {:?}", e);
                             return;
                         }
@@ -504,7 +514,7 @@ impl EventHandler for Handler {
                                 println!("guild id not found")
                             }
                             Some(guild_id) => {
-                                if let Err(e) = add_guild_id(&mut conn, &guild_id).await {
+                                if let Err(e) = add_guild_id(&mut conn, &guild_id) {
                                     println!("Error add_guild_ids: {:?}", e);
                                 }
                             }
@@ -525,11 +535,7 @@ impl EventHandler for Handler {
         println!("{} is connected!", ready.user.name);
 
         // start redis loop
-        let conn = self
-            .redis
-            .get_async_connection()
-            .await
-            .expect("failed to get redis connection");
+        let conn = self.pool.get().expect("failed to get redis connection");
         {
             let ctx = ctx.clone();
             tokio::spawn(async move { redis_loop(conn, ctx).await });
@@ -544,12 +550,8 @@ impl EventHandler for Handler {
             }
         }
 
-        let mut conn = self
-            .redis
-            .get_async_connection()
-            .await
-            .expect("failed to get redis connection");
-        if let Err(e) = clear_and_add_guild_ids(&mut conn, guilds.iter().map(|g| g.id)).await {
+        let mut conn = self.pool.get().expect("failed to get redis connection");
+        if let Err(e) = clear_and_add_guild_ids(&mut conn, guilds.iter().map(|g| g.id)) {
             println!("add_guild_ids Error: {:?}", e);
         }
     }
@@ -559,8 +561,8 @@ impl EventHandler for Handler {
     async fn presence_update(&self, ctx: Context, new_data: Presence) {
         // _new_data.user.id;
         // println!("presence_update: {:?}", _new_data);
-        match self.redis.get_async_connection().await {
-            Err(e) => println!("RedisError: {:?}", e),
+        match self.pool.get() {
+            Err(e) => println!("sqlite error: {:?}", e),
             Ok(mut conn) => match detect_game_from_presence(&mut conn, &new_data).await {
                 Err(e) => println!("Error: {:?}", e),
                 Ok(game) => match game {
@@ -607,9 +609,9 @@ enum GameEvent {
 }
 
 async fn detect_game_from_presence(
-    conn: &mut redis::aio::Connection,
+    conn: &mut DBConnection,
     new_presence: &Presence,
-) -> RedisResult<Option<GameEvent>> {
+) -> DBResult<Option<GameEvent>> {
     let user_id = &new_presence.user.id;
 
     let old_act = get_last_presence_of_user(conn, user_id)
@@ -664,35 +666,41 @@ struct ActivityCore {
 }
 
 async fn get_last_presence_of_user(
-    conn: &mut redis::aio::Connection,
+    conn: &mut DBConnection,
     user_id: &serenity::model::id::UserId,
-) -> RedisResult<Option<ActivityCore>> {
-    let act = conn.get(format!("activity:{}", user_id)).await?;
+) -> DBResult<Option<ActivityCore>> {
+    let mut stmt = conn.prepare("select activity from bot_activity where userid=?")?;
+    let act = stmt.query_row([user_id.0], |row| row.get(0));
     match act {
-        None => Ok(None),
-        Some(act) => {
+        Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+        Ok(act) => {
             let act: String = act;
             Ok(Some(ActivityCore {
                 kind: ActivityType::Playing,
                 name: act,
             }))
         }
+        Err(e) => Err(e),
     }
 }
 
 async fn set_presence_of_user(
-    conn: &mut redis::aio::Connection,
+    conn: &mut DBConnection,
     user_id: &serenity::model::id::UserId,
     act: &Option<ActivityCore>,
-) -> RedisResult<()> {
+) -> DBResult<()> {
     match act {
         Some(act) => {
-            conn.set(format!("activity:{}", user_id), act.name.clone())
-                .await?
+            let mut stmt = conn.prepare("insert into bot_activity(userid,activity) VALUES(?,?) ON CONFLICT DO UPDATE SET activity=?")?;
+            stmt.execute(params![user_id.0, act.name.as_str(), act.name.as_str()])?;
+            Ok(())
         }
-        None => conn.del(format!("activity:{}", user_id)).await?,
+        None => {
+            let mut stmt = conn.prepare("delete from bot_activity where userid=?")?;
+            stmt.execute(params![user_id.0])?;
+            Ok(())
+        }
     }
-    Ok(())
 }
 
 fn is_game_start(old_act: &Option<Vec<ActivityCore>>, new_act: &[ActivityCore]) -> Option<String> {
@@ -787,10 +795,11 @@ async fn main() {
         | GatewayIntents::GUILD_MESSAGE_REACTIONS
         | GatewayIntents::GUILD_PRESENCES;
 
-    let redis_host = env::var("REDIS_HOST").expect("REDIS_HOST not set");
-    let redis_port = env::var("REDIS_PORT").expect("REDIS_PORT not set");
-    let r =
-        redis::Client::open(format!("redis://{}:{}", redis_host, redis_port)).expect("redis fail");
+    // let redis_host = env::var("REDIS_HOST").expect("REDIS_HOST not set");
+    // let redis_port = env::var("REDIS_PORT").expect("REDIS_PORT not set");
+
+    let manager = SqliteConnectionManager::file("data/db.sqlite3");
+    let pool = r2d2::Pool::new(manager).unwrap();
 
     // Create a new instance of the Client, logging in as a bot. This will
     // automatically prepend your bot token with "Bot ", which is a requirement
@@ -798,7 +807,7 @@ async fn main() {
     let mut client = Client::builder(&token, intents)
         .event_handler(Handler {
             web_api,
-            redis: r,
+            pool: pool.clone(),
             watching_msg: Arc::new(Mutex::new(RefCell::new(HashMap::new()))),
         })
         .framework(StandardFramework::new())

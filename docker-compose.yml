@@ -44,21 +44,6 @@ services:
       - bot
     restart: unless-stopped
 
-  db:
-    container_name: nextpex-db
-    image: "postgres:latest"
-    profiles:
-      - devdb
-    restart: unless-stopped
-    ports:
-      - 5432:5432
-    environment:
-      - POSTGRES_USER=nextpex
-      - POSTGRES_PASSWORD=nextpex
-      - POSTGRES_DB=nextpex
-    volumes:
-      - dbdata:/var/lib/postgresql/data
-
   api:
     container_name: nextpex-api
     build: ./fastestserver
