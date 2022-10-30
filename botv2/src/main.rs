@@ -1,4 +1,3 @@
-extern crate redis;
 extern crate reqwest;
 extern crate serde;
 extern crate serde_json;
@@ -19,8 +18,6 @@ use serenity::model::gateway::Ready;
 use serenity::model::prelude::*;
 use serenity::model::prelude::{ActivityType, Emoji, GuildChannel, Presence};
 use serenity::prelude::*;
-
-use redis::AsyncCommands;
 
 struct Handler {
     web_api: String,
