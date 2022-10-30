@@ -16,7 +16,7 @@ services:
 
   frontend:
     build: ./nextpex-frontend
-    restart: always
+    restart: unless-stopped
     ports:
       - "3600:80"
     depends_on:
@@ -26,7 +26,7 @@ services:
 
   frontend-v2:
     build: ./frontend-v2
-    restart: always
+    restart: unless-stopped
     ports:
       - "3600:80"
     depends_on:
@@ -34,12 +34,6 @@ services:
     profiles:
       - frontend-v2
 
-  redis:
-    image: redis:latest
-    volumes:
-      - "redisdata:/data"
-    restart: always
-    
   bot:
     build: ./botv2
     env_file:
@@ -49,14 +43,14 @@ services:
       - redis
     profiles:
       - bot
-    restart: always
-  
+    restart: unless-stopped
+
   api:
     container_name: nextpex-api
     build: ./fastestserver
     ports:
       - "3601:9000"
-    restart: always
+    restart: unless-stopped
     volumes:
       - ./data:/usr/src/app/data
     env_file:
@@ -71,7 +65,7 @@ services:
     build:
       context: watcher
       dockerfile: Dockerfile
-    restart: always
+    restart: unless-stopped
     tty: true
     volumes:
       - ./watcher:/usr/src/app
