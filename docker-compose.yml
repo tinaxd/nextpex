@@ -55,6 +55,21 @@ services:
     env_file:
       - fastestserver/.env
 
+  devdb:
+    container_name: nextpex-devdb
+    image: postgres:latest
+    ports:
+      - 5432:5432
+    environment:
+      - POSTGRES_USER=nextpex
+      - POSTGRES_PASSWORD=nextpex
+      - POSTGRES_DB=nextpex
+    restart: unless-stopped
+    volumes:
+      - dbdata:/var/lib/postgresql/data
+    profiles:
+      - devdb
+
   watcher:
     container_name: nextpex-watcher
     env_file:
