@@ -432,7 +432,7 @@ fn make_requester(zmq_conn: &(String, i32)) -> Result<zmq::Socket> {
 
     let conn = format!("tcp://{}:{}", zmq_conn.0, zmq_conn.1);
 
-    conv_zmq_err(requester.connect(&conn))
+    Err(conv_zmq_err(requester.connect(&conn)))
 }
 
 fn validate_zmq_response(msg: &zmq::Message) -> bool {
@@ -451,19 +451,33 @@ async fn minecraft_joined(
     validate_secret(&req, &data)?;
 
     let requester = make_requester(&data.bot_conn)?;
-    let mut msg = zmq::Message::new();
 
-    let mut db = data.pool.get().map_err(conv_db_err)?;
-    let mut stmt =
-        db.prepare("insert into minecraft_players(playername) VALUES(?) ON CONFLICT DO NOTHING")?;
-    stmt.execute([&body.0.username])?;
+    let db = data.pool.get().map_err(conv_db_err)?;
+    let mut stmt = db
+        .prepare("insert into minecraft_players(playername) VALUES(?) ON CONFLICT DO NOTHING")
+        .map_err(conv_db_err)?;
+    stmt.execute([&body.0.username]).map_err(conv_db_err)?;
 
-    match requester.send(format!("connected:{}", &body.0.username)) {
+    match requester.send(format!("connected:{}", &body.0.username).as_str(), 0) {
         Err(e) => {
             eprintln!("zmq error: {:?}", &e);
             return Err(conv_zmq_err(&e));
         }
-        _ => {}
+        _ => {
+            let mut msg = zmq::Message::new();
+            match requester.recv(&mut msg, 0) {
+                Err(e) => {
+                    eprintln!("zmq res error: {:?}", &e);
+                    return Err(conv_zmq_err(&e));
+                }
+                Ok(()) => {
+                    if !validate_zmq_response(&msg) {
+                        eprintln!("invalid zmq response: {:?}", &msg);
+                        return Err(conv_zmq_err(()));
+                    }
+                }
+            }
+        }
     }
 
     Ok("".to_string())
@@ -477,18 +491,35 @@ async fn minecraft_left(
 ) -> Result<String> {
     validate_secret(&req, &data)?;
 
-    let mut conn = data
-        .redis
-        .get_async_connection()
-        .await
-        .map_err(conv_zmq_err)?;
+    let requester = make_requester(&data.bot_conn)?;
 
-    redis::pipe()
-        .srem("mc_players", &body.username)
-        .lpush("mc_event", format!("disconnected:{}", &body.username))
-        .query_async(&mut conn)
-        .await
-        .map_err(conv_zmq_err)?;
+    let db = data.pool.get().map_err(conv_db_err)?;
+    let mut stmt = db
+        .prepare("delete from minecraft_players where playername=?")
+        .map_err(conv_db_err)?;
+    stmt.execute([&body.0.username]).map_err(conv_db_err)?;
+
+    match requester.send(format!("disconnected:{}", &body.0.username).as_str(), 0) {
+        Err(e) => {
+            eprintln!("zmq error: {:?}", &e);
+            return Err(conv_zmq_err(&e));
+        }
+        _ => {
+            let mut msg = zmq::Message::new();
+            match requester.recv(&mut msg, 0) {
+                Err(e) => {
+                    eprintln!("zmq res error: {:?}", &e);
+                    return Err(conv_zmq_err(&e));
+                }
+                Ok(()) => {
+                    if !validate_zmq_response(&msg) {
+                        eprintln!("invalid zmq response: {:?}", &msg);
+                        return Err(conv_zmq_err(()));
+                    }
+                }
+            }
+        }
+    }
 
     Ok("".to_string())
 }
@@ -502,7 +533,7 @@ async fn main() -> std::io::Result<()> {
 
     HttpServer::new(move || {
         let cors = Cors::default()
-            .allowed_origin_fn(|origin, _req_head| true)
+            .allowed_origin_fn(|_origin, _req_head| true)
             .allowed_methods(vec!["GET", "POST"])
             .allowed_headers(vec![header::AUTHORIZATION, header::ACCEPT])
             .allowed_header(header::CONTENT_TYPE)
