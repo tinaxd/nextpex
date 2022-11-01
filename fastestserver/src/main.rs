@@ -1,39 +1,46 @@
 extern crate actix_web;
 extern crate env_logger;
-extern crate r2d2;
-extern crate r2d2_sqlite;
+
+use std::collections::HashMap;
 
 use actix_cors::Cors;
 use actix_web::http::header;
 use actix_web::web::Json;
 use actix_web::{error, get, post, web, App, HttpRequest, HttpServer, Result};
 use derive_more::{Display, Error};
-use fastestserver::db::{LevelUpdate, MonthlyCheck, PartialRankUpdate, PlayingNow, PlayingTime};
+use fastestserver::db::{
+    DBKeyValue, DBResponse, DBValueOnly, GameValue, LevelUpdate, MonthlyCheck, PartialRankUpdate,
+    PlayHistory, PlayingNow, PlayingTime, RankUpdate,
+};
 use fastestserver::types::{
     AllLevelResponse, AllRankResponse, InsertLevelRequest, InsertRankRequest, InsertRequest,
     LevelResponse, MinecraftJoinedOrLeftRequest, RankResponse,
 };
-use r2d2::PooledConnection;
-use r2d2_sqlite::SqliteConnectionManager;
-use rusqlite::params;
 use serde;
 
 #[derive(Debug, Clone)]
 struct AppState {
-    pool: r2d2::Pool<SqliteConnectionManager>,
-    secret_key: String,
+    db_prefix: DBInfo, // example: http://admin:admin@localhost:5984/nextpex
     bot_conn: (String, i32),
 }
 
-#[derive(Debug, Display, Error)]
-enum DBError {
-    DBError(rusqlite::Error),
+#[derive(Debug, Clone)]
+struct DBInfo {
+    prefix: String,
+    user: String,
+    pass: String,
 }
 
-impl From<rusqlite::Error> for DBError {
-    fn from(err: rusqlite::Error) -> Self {
-        DBError::DBError(err)
-    }
+#[derive(Debug, Display)]
+enum DBError {
+    DBError(String),
+    ConflictError,
+}
+
+type DBResult<T> = std::result::Result<T, DBError>;
+
+fn conv_to_db_err<T>(_err: T) -> DBError {
+    DBError::DBError("db error".to_owned())
 }
 
 fn conv_db_err<T>(_err: T) -> error::Error {
@@ -42,39 +49,98 @@ fn conv_db_err<T>(_err: T) -> error::Error {
 
 impl actix_web::error::ResponseError for DBError {}
 
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct DummyParams {}
+
+async fn db_get_params<T: for<'a> serde::Deserialize<'a>, P: serde::Serialize>(
+    info: &DBInfo,
+    endpoint: &str,
+    query_params: Option<P>,
+) -> DBResult<Vec<T>> {
+    let uri = format!("{}{}", &info.prefix, endpoint);
+    let client = awc::Client::default();
+
+    let mut req = client.get(uri).basic_auth(&info.user, &info.pass);
+    match query_params {
+        Some(query_params) => {
+            req = req.query(&query_params).map_err(|e| {
+                eprintln!("query param err: {:?}", &e);
+                conv_to_db_err(e)
+            })?;
+        }
+        _ => {}
+    }
+    let mut res = req.send().await.map_err(|e| {
+        eprintln!("get error: {:?}", &e);
+        conv_to_db_err(e)
+    })?;
+    let res = res.json::<DBResponse<T>>().await.map_err(|e| {
+        eprintln!("json parse error: {:?}", &e);
+        eprintln!("original response: {:?}", &res);
+        conv_to_db_err(e)
+    })?;
+
+    Ok(res.rows)
+}
+
+async fn db_get<T: for<'a> serde::Deserialize<'a>>(
+    info: &DBInfo,
+    endpoint: &str,
+) -> DBResult<Vec<T>> {
+    db_get_params::<T, DummyParams>(info, endpoint, None).await
+}
+
+async fn get_user_map(info: &DBInfo) -> DBResult<HashMap<String, String>> {
+    let users = db_get::<DBKeyValue<String, String>>(info, "/_design/nextpex/_view/users").await?;
+
+    let mut result = HashMap::new();
+    for user in &users {
+        result.insert(user.value.clone(), user.key.clone());
+    }
+    Ok(result)
+}
+
+async fn get_game_map(info: &DBInfo) -> DBResult<HashMap<String, String>> {
+    let games =
+        db_get::<DBKeyValue<String, GameValue>>(info, "/_design/nextpex/_view/games").await?;
+
+    let mut result = HashMap::new();
+    for game in &games {
+        result.insert(game.value.id.clone(), game.key.clone());
+    }
+    Ok(result)
+}
+
 #[get("/level/all")]
 async fn get_all_levels(data: web::Data<AppState>) -> Result<Json<AllLevelResponse>> {
-    let db = data.pool.get().map_err(conv_db_err)?;
+    let level_iter =
+        db_get::<DBValueOnly<LevelUpdate>>(&data.db_prefix, "/_design/nextpex/_view/level_updates")
+            .await
+            .map_err(conv_db_err)?;
 
-    let mut stmt = db
-        .prepare("select username,newlevel,timeat from levelupdate order by timeat desc")
-        .map_err(conv_db_err)?;
-    let level_iter = stmt
-        .query_map([], |row| {
-            Ok(LevelUpdate {
-                new_level: row.get_unwrap(1),
-                time_at: row.get_unwrap(2),
-                username: row.get_unwrap(0),
-            })
-        })
-        .unwrap();
+    let users = get_user_map(&data.db_prefix).await.map_err(conv_db_err)?;
 
     let mut level_map = std::collections::HashMap::<String, Vec<LevelResponse>>::new();
     for level in level_iter {
-        let level = level.unwrap();
-        match level_map.get_mut(&level.username) {
+        let level = level.value;
+        let username = users.get(&level.user);
+        if username.is_none() {
+            continue;
+        }
+        let username = username.unwrap();
+        match level_map.get_mut(username) {
             Some(v) => {
                 v.push(LevelResponse {
-                    level: level.new_level,
-                    time: level.time_at,
+                    level: level.level,
+                    time: level.time,
                 });
             }
             None => {
                 level_map.insert(
-                    level.username,
+                    username.clone(),
                     vec![LevelResponse {
-                        level: level.new_level,
-                        time: level.time_at,
+                        level: level.level,
+                        time: level.time,
                     }],
                 );
             }
@@ -88,45 +154,46 @@ async fn get_all_ranks(
     data: web::Data<AppState>,
     path: web::Path<(String,)>,
 ) -> Result<Json<AllRankResponse>> {
-    let db = data.pool.get().map_err(conv_db_err)?;
-
     let rank_type = &path.0;
     if *rank_type != "trio" && *rank_type != "arena" {
         return Err(error::ErrorBadRequest("invalid rank type"));
     }
 
-    let mut stmt = db
-        .prepare("select username,newrank,newrankname,timeat from rankupdate WHERE ranktype=? order by timeat desc")
+    let endpoint = if rank_type == "trio" {
+        "/_design/nextpex/_view/rank_trio_updates"
+    } else {
+        "/_design/nextpex/_view/rank_arena_updates"
+    };
+
+    let rank_iter = db_get::<DBValueOnly<RankUpdate>>(&data.db_prefix, endpoint)
+        .await
         .map_err(conv_db_err)?;
-    let rank_iter = stmt
-        .query_map([rank_type], |row| {
-            Ok(PartialRankUpdate {
-                new_rank: row.get_unwrap(1),
-                new_rank_name: row.get_unwrap(2),
-                time_at: row.get_unwrap(3),
-                username: row.get_unwrap(0),
-            })
-        })
-        .unwrap();
+
+    let users = get_user_map(&data.db_prefix).await.map_err(conv_db_err)?;
 
     let mut rank_map = std::collections::HashMap::<String, Vec<RankResponse>>::new();
     for rank in rank_iter {
-        let rank = rank.unwrap();
-        match rank_map.get_mut(&rank.username) {
+        let rank = rank.value;
+        let username = users.get(&rank.user);
+        if username.is_none() {
+            continue;
+        }
+        let username = username.unwrap();
+        match rank_map.get_mut(username) {
             Some(v) => {
                 v.push(RankResponse {
-                    rank: rank.new_rank,
-                    rank_name: rank.new_rank_name,
-                    time: rank.time_at,
+                    rank: rank.rank,
+                    rank_name: rank.rank_name,
+                    time: rank.time,
                 });
             }
             None => {
                 rank_map.insert(
-                    rank.username,
+                    username.clone(),
                     vec![RankResponse {
-                        rank: rank.new_rank,
-                        rank_name: rank.new_rank_name,
-                        time: rank.time_at,
+                        rank: rank.rank,
+                        rank_name: rank.rank_name,
+                        time: rank.time,
                     }],
                 );
             }
@@ -137,27 +204,34 @@ async fn get_all_ranks(
 
 #[get("/check/now")]
 async fn get_now_playing(data: web::Data<AppState>) -> Result<Json<Vec<PlayingNow>>> {
-    let db = data.pool.get().map_err(conv_db_err)?;
+    unimplemented!()
+    // let db = data.pool.get().map_err(conv_db_err)?;
 
-    let mut stmt = db
-        .prepare("select username,gamename,startedat from playingnow order by startedat desc")
-        .map_err(conv_db_err)?;
-    let playing_iter = stmt
-        .query_map([], |row| {
-            Ok(PlayingNow {
-                username: row.get_unwrap(0),
-                gamename: row.get_unwrap(1),
-                started_at: row.get_unwrap(2),
-            })
-        })
-        .unwrap();
+    // let mut stmt = db
+    //     .prepare("select username,gamename,startedat from playingnow order by startedat desc")
+    //     .map_err(conv_db_err)?;
+    // let playing_iter = stmt
+    //     .query_map([], |row| {
+    //         Ok(PlayingNow {
+    //             username: row.get_unwrap(0),
+    //             gamename: row.get_unwrap(1),
+    //             started_at: row.get_unwrap(2),
+    //         })
+    //     })
+    //     .unwrap();
 
-    Ok(web::Json(playing_iter.map(|x| x.unwrap()).collect()))
+    // Ok(web::Json(playing_iter.map(|x| x.unwrap()).collect()))
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
 struct LimitQuery {
     limit: Option<u32>,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+struct PlayHistoryQueryParam {
+    limit: u32,
+    descending: bool,
 }
 
 #[get("/check/history")]
@@ -167,69 +241,63 @@ async fn get_latest_game_sessions(
 ) -> Result<Json<Vec<PlayingTime>>> {
     let limit = limit.limit.unwrap_or(20);
 
-    let db = data.pool.get().map_err(conv_db_err)?;
-    let mut stmt = db.prepare("select username,gamename,startedat,endedat from playingtime order by endedat desc limit ?").map_err(conv_db_err)?;
-    let iter = stmt
-        .query_map([limit], |row| {
-            Ok(PlayingTime {
-                username: row.get_unwrap(0),
-                gamename: row.get_unwrap(1),
-                started_at: row.get_unwrap(2),
-                ended_at: row.get_unwrap(3),
+    let histories = db_get_params::<DBValueOnly<PlayHistory>, PlayHistoryQueryParam>(
+        &data.db_prefix,
+        "/_design/nextpex/_view/play_history",
+        Some(PlayHistoryQueryParam {
+            limit: limit,
+            descending: true,
+        }),
+    )
+    .await
+    .map_err(conv_db_err)?;
+
+    let users = get_user_map(&data.db_prefix).await.map_err(conv_db_err)?;
+    let games = get_game_map(&data.db_prefix).await.map_err(conv_db_err)?;
+
+    let playing_times = histories
+        .iter()
+        .filter_map(|h| {
+            let h = &h.value;
+            let username = users.get(&h.user);
+            if username.is_none() {
+                return None;
+            }
+            let gamename = games.get(&h.game);
+            if gamename.is_none() {
+                return None;
+            }
+            Some(PlayingTime {
+                username: username.unwrap().clone(),
+                gamename: gamename.unwrap().clone(),
+                started_at: *h.started_at.get(0).unwrap() as i64,
+                ended_at: *h.ended_at.get(0).unwrap() as i64,
             })
         })
-        .map_err(conv_db_err)?;
+        .collect();
 
-    Ok(web::Json(iter.map(|x| x.unwrap()).collect()))
+    Ok(web::Json(playing_times))
 }
 
 #[get("/check/monthly")]
 async fn get_monthly_playing_time(data: web::Data<AppState>) -> Result<Json<Vec<MonthlyCheck>>> {
-    let db = data.pool.get().map_err(conv_db_err)?;
+    unimplemented!()
+    // let histories =
+    //     db_get::<PlayHistory>(&data.db_prefix, "/_design/nextpex/_view/play_history", "")
+    //         .await
+    //         .map_err(conv_db_err)?;
 
-    let mut stmt = db
-        .prepare("select username,gamename,month,year,playtime from monthlycheck")
-        .map_err(conv_db_err)?;
+    // let playingTimes = histories
+    //     .iter()
+    //     .map(|h| PlayingTime {
+    //         username: h.user.clone(),
+    //         gamename: h.game.clone(),
+    //         started_at: *h.started_at.get(0).unwrap() as i64,
+    //         ended_at: *h.ended_at.get(0).unwrap() as i64,
+    //     })
+    //     .collect();
 
-    let iter = stmt
-        .query_map([], |row| {
-            Ok((
-                row.get_unwrap(0),
-                row.get_unwrap(1),
-                row.get_unwrap(2),
-                row.get_unwrap(3),
-                row.get_unwrap(4),
-            ))
-        })
-        .map_err(conv_db_err)?;
-
-    let s2i = |s: String| s.parse::<i32>().ok();
-
-    let vec = iter
-        .map(|x| {
-            let (username, gamename, month, year, playtime) = x.unwrap();
-            Some(MonthlyCheck {
-                username,
-                gamename,
-                month: s2i(month)?,
-                year: s2i(year)?,
-                playtime,
-            })
-        })
-        .collect::<Vec<Option<MonthlyCheck>>>();
-    let vec_len = vec.len();
-
-    let clean_vec = vec
-        .into_iter()
-        .filter(|x| x.is_some())
-        .map(|x| x.unwrap())
-        .collect::<Vec<MonthlyCheck>>();
-
-    if vec_len != clean_vec.len() {
-        return Err(conv_db_err(()));
-    }
-
-    Ok(web::Json(clean_vec))
+    // Ok(web::Json(playingTimes))
 }
 
 // type DBPool = r2d2::Pool<SqliteConnectionManager>;
@@ -250,110 +318,107 @@ async fn get_monthly_playing_time(data: web::Data<AppState>) -> Result<Json<Vec<
 //     }
 // }
 
-async fn get_username_from_ingamename(
-    db: &PooledConnection<SqliteConnectionManager>,
-    in_game_name: &str,
-) -> Result<Option<String>> {
-    let mut stmt = db
-        .prepare("select username from ingamename where ingamename=?")
-        .map_err(conv_db_err)?;
-    let mut rows = stmt
-        .query_map([in_game_name], |row| Ok(row.get_unwrap(0)))
-        .map_err(conv_db_err)?;
-    let row = rows.next();
-    match row {
-        Some(row) => Ok(Some(row.unwrap())),
-        None => Ok(None),
-    }
+async fn get_username_from_ingamename(in_game_name: &str) -> Result<Option<String>> {
+    unimplemented!()
+    // let mut stmt = db
+    //     .prepare("select username from ingamename where ingamename=?")
+    //     .map_err(conv_db_err)?;
+    // let mut rows = stmt
+    //     .query_map([in_game_name], |row| Ok(row.get_unwrap(0)))
+    //     .map_err(conv_db_err)?;
+    // let row = rows.next();
+    // match row {
+    //     Some(row) => Ok(Some(row.unwrap())),
+    //     None => Ok(None),
+    // }
 }
 
-async fn game_existence_check(
-    db: &PooledConnection<SqliteConnectionManager>,
-    game_name: &str,
-) -> Result<bool> {
-    let mut stmt = db
-        .prepare("select gamename from game where gamename=?")
-        .map_err(conv_db_err)?;
-    let mut rows = stmt
-        .query_map([game_name], |row| Ok(row.get_unwrap::<usize, String>(0)))
-        .map_err(conv_db_err)?;
-    let row = rows.next();
-    Ok(row.is_some())
+async fn game_existence_check(game_name: &str) -> Result<bool> {
+    unimplemented!()
+    // let mut stmt = db
+    //     .prepare("select gamename from game where gamename=?")
+    //     .map_err(conv_db_err)?;
+    // let mut rows = stmt
+    //     .query_map([game_name], |row| Ok(row.get_unwrap::<usize, String>(0)))
+    //     .map_err(conv_db_err)?;
+    // let row = rows.next();
+    // Ok(row.is_some())
 }
 
 #[post("/check")]
 async fn insert_check(data: web::Data<AppState>, req: web::Json<InsertRequest>) -> Result<String> {
-    let mut db = data.pool.get().map_err(conv_db_err)?;
+    unimplemented!()
+    // let mut db = data.pool.get().map_err(conv_db_err)?;
 
-    let username = get_username_from_ingamename(&db, &req.in_game_name).await?;
-    let username = match username {
-        None => return Err(error::ErrorNotFound("in-game name not found")),
-        Some(username) => username,
-    };
-    match req.r#type.as_str() {
-        "start" => {
-            if !game_existence_check(&db, &req.game_name).await? {
-                return Err(error::ErrorNotFound("game not found"));
-            }
-            let tx = db.transaction().map_err(conv_db_err)?;
-            tx.execute(
-                "insert into playingnow (username,gamename,startedat) values (?,?,?) ON CONFLICT(username) DO UPDATE SET gamename=?,startedat=?", params![&username, &req.game_name, &req.time, &req.game_name, &req.time]).map_err(conv_db_err)?;
+    // let username = get_username_from_ingamename(&db, &req.in_game_name).await?;
+    // let username = match username {
+    //     None => return Err(error::ErrorNotFound("in-game name not found")),
+    //     Some(username) => username,
+    // };
+    // match req.r#type.as_str() {
+    //     "start" => {
+    //         if !game_existence_check(&db, &req.game_name).await? {
+    //             return Err(error::ErrorNotFound("game not found"));
+    //         }
+    //         let tx = db.transaction().map_err(conv_db_err)?;
+    //         tx.execute(
+    //             "insert into playingnow (username,gamename,startedat) values (?,?,?) ON CONFLICT(username) DO UPDATE SET gamename=?,startedat=?", params![&username, &req.game_name, &req.time, &req.game_name, &req.time]).map_err(conv_db_err)?;
 
-            tx.commit().map_err(conv_db_err)?;
-            return Ok("".to_string());
-        }
-        "stop" => {
-            if !game_existence_check(&db, &req.game_name).await? {
-                return Err(error::ErrorNotFound("game not found"));
-            }
+    //         tx.commit().map_err(conv_db_err)?;
+    //         return Ok("".to_string());
+    //     }
+    //     "stop" => {
+    //         if !game_existence_check(&db, &req.game_name).await? {
+    //             return Err(error::ErrorNotFound("game not found"));
+    //         }
 
-            let tx = db.transaction().map_err(conv_db_err)?;
+    //         let tx = db.transaction().map_err(conv_db_err)?;
 
-            let (gamename, started_at) = {
-                // retrive start info from playingnow table
-                let mut stmt = tx
-                    .prepare("select gamename,startedat from playingnow where username=?")
-                    .map_err(conv_db_err)?;
-                let mut rows = stmt
-                    .query_map([&username], |row| {
-                        Ok((row.get_unwrap(0), row.get_unwrap(1)))
-                    })
-                    .map_err(conv_db_err)?;
-                match rows.next() {
-                    Some(row) => row.unwrap(),
-                    None => return Err(error::ErrorNotFound("start entry not found")),
-                }
-            };
+    //         let (gamename, started_at) = {
+    //             // retrive start info from playingnow table
+    //             let mut stmt = tx
+    //                 .prepare("select gamename,startedat from playingnow where username=?")
+    //                 .map_err(conv_db_err)?;
+    //             let mut rows = stmt
+    //                 .query_map([&username], |row| {
+    //                     Ok((row.get_unwrap(0), row.get_unwrap(1)))
+    //                 })
+    //                 .map_err(conv_db_err)?;
+    //             match rows.next() {
+    //                 Some(row) => row.unwrap(),
+    //                 None => return Err(error::ErrorNotFound("start entry not found")),
+    //             }
+    //         };
 
-            let gamename: String = gamename;
-            let started_at: i32 = started_at;
+    //         let gamename: String = gamename;
+    //         let started_at: i32 = started_at;
 
-            // if game names do not match, reject the request
-            if gamename != req.game_name {
-                return Err(error::ErrorBadRequest(
-                    "game name does not match with start info",
-                ));
-            }
+    //         // if game names do not match, reject the request
+    //         if gamename != req.game_name {
+    //             return Err(error::ErrorBadRequest(
+    //                 "game name does not match with start info",
+    //             ));
+    //         }
 
-            // delete from playingnow table
-            tx.execute("delete from playingnow where username=?", params![username])
-                .map_err(conv_db_err)?;
+    //         // delete from playingnow table
+    //         tx.execute("delete from playingnow where username=?", params![username])
+    //             .map_err(conv_db_err)?;
 
-            // insert into playingtime table
-            tx.execute(
-                "insert into playingtime (username,gamename,startedat,endedat) values (?,?,?,?)",
-                params![username, req.game_name, started_at, req.time],
-            )
-            .map_err(conv_db_err)?;
+    //         // insert into playingtime table
+    //         tx.execute(
+    //             "insert into playingtime (username,gamename,startedat,endedat) values (?,?,?,?)",
+    //             params![username, req.game_name, started_at, req.time],
+    //         )
+    //         .map_err(conv_db_err)?;
 
-            tx.commit().map_err(conv_db_err)?;
+    //         tx.commit().map_err(conv_db_err)?;
 
-            return Ok("".to_string());
-        }
-        _ => {
-            return Err(error::ErrorBadRequest("type must be 'start' or 'stop"));
-        }
-    }
+    //         return Ok("".to_string());
+    //     }
+    //     _ => {
+    //         return Err(error::ErrorBadRequest("type must be 'start' or 'stop"));
+    //     }
+    // }
 }
 
 #[post("/level")]
@@ -361,25 +426,26 @@ async fn insert_level_update(
     data: web::Data<AppState>,
     req: web::Json<InsertLevelRequest>,
 ) -> Result<String> {
-    let mut db = data.pool.get().map_err(conv_db_err)?;
+    unimplemented!()
+    // let mut db = data.pool.get().map_err(conv_db_err)?;
 
-    let username = get_username_from_ingamename(&db, &req.in_game_name).await?;
-    let username = match username {
-        None => return Err(error::ErrorNotFound("in-game name not found")),
-        Some(username) => username,
-    };
+    // let username = get_username_from_ingamename(&db, &req.in_game_name).await?;
+    // let username = match username {
+    //     None => return Err(error::ErrorNotFound("in-game name not found")),
+    //     Some(username) => username,
+    // };
 
-    let tx = db.transaction().map_err(conv_db_err)?;
+    // let tx = db.transaction().map_err(conv_db_err)?;
 
-    tx.execute(
-        "insert into levelupdate (username,oldlevel,newlevel,timeat) values (?,?,?,?)",
-        params![&username, req.old_level, req.new_level, req.time],
-    )
-    .map_err(conv_db_err)?;
+    // tx.execute(
+    //     "insert into levelupdate (username,oldlevel,newlevel,timeat) values (?,?,?,?)",
+    //     params![&username, req.old_level, req.new_level, req.time],
+    // )
+    // .map_err(conv_db_err)?;
 
-    tx.commit().map_err(conv_db_err)?;
+    // tx.commit().map_err(conv_db_err)?;
 
-    Ok("".to_string())
+    // Ok("".to_string())
 }
 
 #[post("/rank")]
@@ -387,39 +453,26 @@ async fn insert_rank_update(
     data: web::Data<AppState>,
     req: web::Json<InsertRankRequest>,
 ) -> Result<String> {
-    let mut db = data.pool.get().map_err(conv_db_err)?;
+    unimplemented!()
+    // let mut db = data.pool.get().map_err(conv_db_err)?;
 
-    let username = get_username_from_ingamename(&db, &req.in_game_name).await?;
-    let username = match username {
-        None => return Err(error::ErrorNotFound("in-game name not found")),
-        Some(username) => username,
-    };
+    // let username = get_username_from_ingamename(&db, &req.in_game_name).await?;
+    // let username = match username {
+    //     None => return Err(error::ErrorNotFound("in-game name not found")),
+    //     Some(username) => username,
+    // };
 
-    let tx = db.transaction().map_err(conv_db_err)?;
+    // let tx = db.transaction().map_err(conv_db_err)?;
 
-    tx.execute(
-        "insert into rankupdate (username,oldrank,oldrankname,newrank,newrankname,timeat,ranktype) values (?,?,?,?,?,?,?)",
-        params![&username, req.old_rank, &req.old_rank_name, req.new_rank, &req.new_rank_name, req.time, &req.rank_type],
-    )
-    .map_err(conv_db_err)?;
+    // tx.execute(
+    //     "insert into rankupdate (username,oldrank,oldrankname,newrank,newrankname,timeat,ranktype) values (?,?,?,?,?,?,?)",
+    //     params![&username, req.old_rank, &req.old_rank_name, req.new_rank, &req.new_rank_name, req.time, &req.rank_type],
+    // )
+    // .map_err(conv_db_err)?;
 
-    tx.commit().map_err(conv_db_err)?;
+    // tx.commit().map_err(conv_db_err)?;
 
-    Ok("".to_string())
-}
-
-fn validate_secret(req: &HttpRequest, data: &web::Data<AppState>) -> Result<()> {
-    let secret = req.headers().get("X-Nextpex-Secret");
-    match secret {
-        None => Err(error::ErrorUnauthorized("need auth")),
-        Some(secret) => {
-            if secret != &data.secret_key {
-                Err(error::ErrorUnauthorized("invalid secret"))
-            } else {
-                Ok(())
-            }
-        }
-    }
+    // Ok("".to_string())
 }
 
 fn conv_zmq_err<T>(_err: T) -> error::Error {
@@ -445,91 +498,86 @@ fn validate_zmq_response(msg: &zmq::Message) -> bool {
 #[post("/minecraft/joined")]
 async fn minecraft_joined(
     data: web::Data<AppState>,
-    req: HttpRequest,
+    _req: HttpRequest,
     body: web::Json<MinecraftJoinedOrLeftRequest>,
 ) -> Result<String> {
-    validate_secret(&req, &data)?;
+    unimplemented!()
+    // let requester = make_requester(&data.bot_conn)?;
 
-    let requester = make_requester(&data.bot_conn)?;
+    // let db = data.pool.get().map_err(conv_db_err)?;
+    // let mut stmt = db
+    //     .prepare("insert into minecraft_players(playername) VALUES(?) ON CONFLICT DO NOTHING")
+    //     .map_err(conv_db_err)?;
+    // stmt.execute([&body.0.username]).map_err(conv_db_err)?;
 
-    let db = data.pool.get().map_err(conv_db_err)?;
-    let mut stmt = db
-        .prepare("insert into minecraft_players(playername) VALUES(?) ON CONFLICT DO NOTHING")
-        .map_err(conv_db_err)?;
-    stmt.execute([&body.0.username]).map_err(conv_db_err)?;
+    // match requester.send(format!("connected:{}", &body.0.username).as_str(), 0) {
+    //     Err(e) => {
+    //         eprintln!("zmq error: {:?}", &e);
+    //         return Err(conv_zmq_err(&e));
+    //     }
+    //     _ => {
+    //         let mut msg = zmq::Message::new();
+    //         match requester.recv(&mut msg, 0) {
+    //             Err(e) => {
+    //                 eprintln!("zmq res error: {:?}", &e);
+    //                 return Err(conv_zmq_err(&e));
+    //             }
+    //             Ok(()) => {
+    //                 if !validate_zmq_response(&msg) {
+    //                     eprintln!("invalid zmq response: {:?}", &msg);
+    //                     return Err(conv_zmq_err(()));
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
 
-    match requester.send(format!("connected:{}", &body.0.username).as_str(), 0) {
-        Err(e) => {
-            eprintln!("zmq error: {:?}", &e);
-            return Err(conv_zmq_err(&e));
-        }
-        _ => {
-            let mut msg = zmq::Message::new();
-            match requester.recv(&mut msg, 0) {
-                Err(e) => {
-                    eprintln!("zmq res error: {:?}", &e);
-                    return Err(conv_zmq_err(&e));
-                }
-                Ok(()) => {
-                    if !validate_zmq_response(&msg) {
-                        eprintln!("invalid zmq response: {:?}", &msg);
-                        return Err(conv_zmq_err(()));
-                    }
-                }
-            }
-        }
-    }
-
-    Ok("".to_string())
+    // Ok("".to_string())
 }
 
 #[post("/minecraft/left")]
 async fn minecraft_left(
     data: web::Data<AppState>,
-    req: HttpRequest,
+    _req: HttpRequest,
     body: web::Json<MinecraftJoinedOrLeftRequest>,
 ) -> Result<String> {
-    validate_secret(&req, &data)?;
+    unimplemented!()
+    // let requester = make_requester(&data.bot_conn)?;
 
-    let requester = make_requester(&data.bot_conn)?;
+    // let db = data.pool.get().map_err(conv_db_err)?;
+    // let mut stmt = db
+    //     .prepare("delete from minecraft_players where playername=?")
+    //     .map_err(conv_db_err)?;
+    // stmt.execute([&body.0.username]).map_err(conv_db_err)?;
 
-    let db = data.pool.get().map_err(conv_db_err)?;
-    let mut stmt = db
-        .prepare("delete from minecraft_players where playername=?")
-        .map_err(conv_db_err)?;
-    stmt.execute([&body.0.username]).map_err(conv_db_err)?;
+    // match requester.send(format!("disconnected:{}", &body.0.username).as_str(), 0) {
+    //     Err(e) => {
+    //         eprintln!("zmq error: {:?}", &e);
+    //         return Err(conv_zmq_err(&e));
+    //     }
+    //     _ => {
+    //         let mut msg = zmq::Message::new();
+    //         match requester.recv(&mut msg, 0) {
+    //             Err(e) => {
+    //                 eprintln!("zmq res error: {:?}", &e);
+    //                 return Err(conv_zmq_err(&e));
+    //             }
+    //             Ok(()) => {
+    //                 if !validate_zmq_response(&msg) {
+    //                     eprintln!("invalid zmq response: {:?}", &msg);
+    //                     return Err(conv_zmq_err(()));
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
 
-    match requester.send(format!("disconnected:{}", &body.0.username).as_str(), 0) {
-        Err(e) => {
-            eprintln!("zmq error: {:?}", &e);
-            return Err(conv_zmq_err(&e));
-        }
-        _ => {
-            let mut msg = zmq::Message::new();
-            match requester.recv(&mut msg, 0) {
-                Err(e) => {
-                    eprintln!("zmq res error: {:?}", &e);
-                    return Err(conv_zmq_err(&e));
-                }
-                Ok(()) => {
-                    if !validate_zmq_response(&msg) {
-                        eprintln!("invalid zmq response: {:?}", &msg);
-                        return Err(conv_zmq_err(()));
-                    }
-                }
-            }
-        }
-    }
-
-    Ok("".to_string())
+    // Ok("".to_string())
 }
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     env_logger::init();
-
-    let manager = SqliteConnectionManager::file("data/db.sqlite3");
-    let pool = r2d2::Pool::new(manager).unwrap();
 
     HttpServer::new(move || {
         let cors = Cors::default()
@@ -539,7 +587,6 @@ async fn main() -> std::io::Result<()> {
             .allowed_header(header::CONTENT_TYPE)
             .supports_credentials()
             .max_age(3600);
-        let secret_key = std::env::var("SECRET_KEY").expect("SECRET_KEY not set");
 
         let bot_addr = std::env::var("BOT_ADDR").expect("BOT_ADDR not set");
         let bot_port = std::env::var("BOT_PORT")
@@ -549,8 +596,11 @@ async fn main() -> std::io::Result<()> {
 
         App::new()
             .app_data(web::Data::new(AppState {
-                pool: pool.clone(),
-                secret_key,
+                db_prefix: DBInfo {
+                    prefix: "http://localhost:5984/nextpex".to_owned(),
+                    user: "admin".to_owned(),
+                    pass: "admin".to_owned(),
+                },
                 bot_conn: (bot_addr, bot_port),
             }))
             .wrap(cors)
