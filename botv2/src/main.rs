@@ -11,11 +11,11 @@ use std::env;
 use std::sync::Arc;
 
 use chrono::TimeZone;
+use r2d2::{Pool, PooledConnection};
+use r2d2_sqlite::SqliteConnectionManager;
 use serenity::async_trait;
 use serenity::framework::StandardFramework;
 use serenity::model;
-use serenity::model::channel::Message;
-use serenity::model::gateway::Ready;
 use serenity::model::prelude::*;
 use serenity::model::prelude::{ActivityType, Emoji, GuildChannel, Presence};
 use serenity::prelude::*;
@@ -25,21 +25,20 @@ use redis::AsyncCommands;
 struct Handler {
     web_api: String,
     redis: redis::Client,
+    pool: Arc<Mutex<r2d2::Pool<SqliteConnectionManager>>>,
     watching_msg:
         Arc<Mutex<RefCell<HashMap<serenity::model::id::GuildId, serenity::model::id::MessageId>>>>,
 }
 
+type SqliteResult<T> = std::result::Result<T, rusqlite::Error>;
 type RedisResult<T> = std::result::Result<T, redis::RedisError>;
 
-async fn get_players_from_redis(conn: &mut redis::aio::Connection) -> RedisResult<Vec<String>> {
-    match conn.smembers("mc_players").await {
-        Err(e) => Err(e),
-        Ok(players) => {
-            let mut players: Vec<String> = players;
-            players.sort();
-            Ok(players)
-        }
-    }
+fn get_players_from_redis(
+    db: &PooledConnection<SqliteConnectionManager>,
+) -> SqliteResult<Vec<String>> {
+    let mut stmt = db.prepare("SELECT name FROM minecraft_players")?;
+    let rows = stmt.query_map([], |row| Ok(row.get_unwrap::<usize, String>(0)))?;
+    Ok(rows.into_iter().map(|r| r.unwrap()).collect())
 }
 
 async fn get_guild_ids(
@@ -82,26 +81,30 @@ async fn add_guild_id(
     Ok(())
 }
 
-async fn get_target_channel(
-    conn: &mut redis::aio::Connection,
+fn get_target_channel(
+    db: &PooledConnection<SqliteConnectionManager>,
     guild_id: &serenity::model::id::GuildId,
-) -> RedisResult<Option<serenity::model::id::ChannelId>> {
-    match conn.get(format!("mc_channel:{}", guild_id.0)).await {
-        Err(e) => Err(e),
-        Ok(channel_id) => match channel_id {
-            Some(channel_id) => Ok(Some(serenity::model::id::ChannelId(channel_id))),
-            None => Ok(None),
-        },
+) -> SqliteResult<Option<serenity::model::id::ChannelId>> {
+    let mut stmt = db.prepare("SELECT minecraft_channel FROM bot_guilds WHERE guild_id=?")?;
+    let result = stmt.query_row([guild_id.0], |row| {
+        Ok(row.get_unwrap::<usize, Option<u64>>(0))
+    })?;
+
+    match result {
+        None => Ok(None),
+        Some(x) => Ok(Some(serenity::model::id::ChannelId(x))),
     }
 }
 
-async fn set_target_channel(
-    conn: &mut redis::aio::Connection,
+fn set_target_channel(
+    db: &PooledConnection<SqliteConnectionManager>,
     guild_id: &serenity::model::id::GuildId,
     channel_id: &serenity::model::id::ChannelId,
-) -> RedisResult<()> {
-    conn.set(format!("mc_channel:{}", guild_id.0), channel_id.0)
-        .await
+) -> SqliteResult<()> {
+    let mut stmt = db.prepare("INSERT INTO bot_guilds(guild_id, minecraft_channel) VALUES(?, ?) ON CONFLICT DO UPDATE SET minecraft_channel=?")?;
+    stmt.execute([guild_id.0, channel_id.0, channel_id.0])?;
+
+    Ok(())
 }
 
 fn build_message(players: &[String]) -> String {
@@ -122,6 +125,7 @@ enum EventParseResult {
 }
 
 async fn process_event(
+    pool: Arc<Mutex<Pool<SqliteConnectionManager>>>,
     conn: &mut redis::aio::Connection,
     ctx: &Context,
     event: &str,
@@ -151,22 +155,41 @@ async fn process_event(
         } {
             ValidMessage(text) => {
                 let guild_ids = get_guild_ids(conn).await.map_err(|e| e.to_string())?;
-                for guild_id in guild_ids {
-                    match get_target_channel(conn, &guild_id).await {
-                        Err(e) => return Err(e.to_string()),
-                        Ok(channel_id) => match channel_id {
-                            Some(channel_id) => {
-                                if let Err(e) = channel_id.say(&ctx.http, text.as_str()).await {
-                                    return Err(e.to_string());
-                                }
+
+                let pool = pool.lock().await;
+                {
+                    let conn = pool.get();
+                    for guild_id in guild_ids {
+                        let result = match conn {
+                            Err(e) => Err(e.to_string()),
+                            Ok(db) => {
+                                let result = match get_target_channel(&db, &guild_id) {
+                                    Err(e) => Err(e.to_string()),
+                                    Ok(channel_id) => match channel_id {
+                                        Some(channel_id) => {
+                                            if let Err(e) =
+                                                channel_id.say(&ctx.http, text.as_str()).await
+                                            {
+                                                Err(e.to_string())
+                                            } else {
+                                                Ok(())
+                                            }
+                                        }
+                                        None => {
+                                            println!(
+                                                "target channel for guild {} is not set",
+                                                guild_id
+                                            );
+                                            Ok(())
+                                        }
+                                    },
+                                };
+                                result
                             }
-                            None => {
-                                println!("target channel for guild {} is not set", guild_id);
-                            }
-                        },
+                        };
                     }
+                    Ok(())
                 }
-                Ok(())
             }
             InvalidFormat => Err(format!("Error: invalid format: {}", event)),
             UnknownEvent => Err(format!("Error: unknown event: {}", event)),
@@ -176,7 +199,11 @@ async fn process_event(
     }
 }
 
-async fn redis_loop(mut conn: redis::aio::Connection, ctx: Context) {
+async fn redis_loop(
+    db: Arc<Mutex<Pool<SqliteConnectionManager>>>,
+    mut conn: redis::aio::Connection,
+    ctx: Context,
+) {
     loop {
         let event = conn.brpop("mc_event", 0).await;
         match event {
@@ -184,7 +211,7 @@ async fn redis_loop(mut conn: redis::aio::Connection, ctx: Context) {
             Ok(event) => {
                 let event: (String, String) = event;
                 let event = event.1;
-                if let Err(e) = process_event(&mut conn, &ctx, &event).await {
+                if let Err(e) = process_event(db.clone(), &mut conn, &ctx, &event).await {
                     println!("Error: {}", e);
                 }
             }
@@ -465,9 +492,11 @@ impl EventHandler for Handler {
             // authentication error, or lack of permissions to post in the
             // channel, so log to stdout when some error happens, with a
             // description of it.
-            match self.redis.get_async_connection().await {
+            let pool = self.pool.lock().await;
+            match pool.get() {
                 Ok(mut conn) => {
-                    let players = get_players_from_redis(&mut conn).await;
+                    let players = get_players_from_redis(&mut conn);
+                    std::mem::drop(pool);
                     match players {
                         Err(e) => println!("Error: {:?}", e),
                         Ok(players) => {
@@ -478,42 +507,45 @@ impl EventHandler for Handler {
                         }
                     }
                 }
-                Err(e) => println!("RedisError: {:?}", e),
+                Err(e) => println!("SqliteError: {:?}", e),
             }
         } else if content == "set" {
-            match self.redis.get_async_connection().await {
-                Err(e) => println!("RedisError: {:?}", e),
-                Ok(mut conn) => {
-                    if let Some(guild_id) = msg.guild_id {
-                        let channel_id = msg.channel_id;
-                        if let Err(e) = set_target_channel(&mut conn, &guild_id, &channel_id).await
-                        {
-                            println!("Error set_target_channel: {:?}", e);
-                            return;
-                        }
-                        if let Err(why) = msg
-                            .channel_id
-                            .say(
-                                &ctx.http,
-                                "このチャンネルをMinecraftログインの通知先に設定しました",
-                            )
-                            .await
-                        {
-                            println!("Error sending message: {:?}", why);
-                        }
-
-                        match msg.guild_id {
-                            None => {
-                                println!("guild id not found")
+            let pool = self.pool.lock().await;
+            match pool.get() {
+                Err(e) => println!("SqliteError: {:?}", e),
+                Ok(mut conn) => match self.redis.get_async_connection().await {
+                    Err(e) => println!("RedisError: {:?}", e),
+                    Ok(mut redis_conn) => {
+                        if let Some(guild_id) = msg.guild_id {
+                            let channel_id = msg.channel_id;
+                            if let Err(e) = set_target_channel(&mut conn, &guild_id, &channel_id) {
+                                println!("Error set_target_channel: {:?}", e);
+                                return;
                             }
-                            Some(guild_id) => {
-                                if let Err(e) = add_guild_id(&mut conn, &guild_id).await {
-                                    println!("Error add_guild_ids: {:?}", e);
+                            if let Err(why) = msg
+                                .channel_id
+                                .say(
+                                    &ctx.http,
+                                    "このチャンネルをMinecraftログインの通知先に設定しました",
+                                )
+                                .await
+                            {
+                                println!("Error sending message: {:?}", why);
+                            }
+
+                            match msg.guild_id {
+                                None => {
+                                    println!("guild id not found")
+                                }
+                                Some(guild_id) => {
+                                    if let Err(e) = add_guild_id(&mut redis_conn, &guild_id).await {
+                                        println!("Error add_guild_ids: {:?}", e);
+                                    }
                                 }
                             }
                         }
                     }
-                }
+                },
             }
         }
     }
@@ -534,8 +566,9 @@ impl EventHandler for Handler {
             .await
             .expect("failed to get redis connection");
         {
+            let c_pool = self.pool.clone();
             let ctx = ctx.clone();
-            tokio::spawn(async move { redis_loop(conn, ctx).await });
+            tokio::spawn(async move { redis_loop(c_pool, conn, ctx).await });
         }
 
         // send self-apexability msg
@@ -780,6 +813,9 @@ async fn find_emoji(
 async fn main() {
     let web_api = env::var("WEB_API").expect("WEB_API not set");
 
+    let manager = SqliteConnectionManager::file("data/db.sqlite3");
+    let pool = r2d2::Pool::new(manager).unwrap();
+
     // Configure the client with your Discord bot token in the environment.
     let token = env::var("DISCORD_TOKEN").expect("DISCORD_TOKEN not set");
     // Set gateway intents, which decides what events the bot will be notified about
@@ -802,6 +838,7 @@ async fn main() {
         .event_handler(Handler {
             web_api,
             redis: r,
+            pool: Arc::new(Mutex::new(pool)),
             watching_msg: Arc::new(Mutex::new(RefCell::new(HashMap::new()))),
         })
         .framework(StandardFramework::new())
