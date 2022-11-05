@@ -104,8 +104,8 @@ func postDoc(doc interface{}) string {
 	// fmt.Println(string(body))
 }
 
-func convTime(unixtime int64) primitive.Timestamp {
-	return primitive.Timestamp{T: uint32(unixtime)}
+func convTime(unixtime int64) primitive.DateTime {
+	return primitive.DateTime(unixtime * 1000)
 }
 
 func main() {
