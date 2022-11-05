@@ -1,21 +1,26 @@
 extern crate actix_web;
 extern crate env_logger;
 
-use std::collections::HashMap;
+use std::fmt::Debug;
 
 use actix_cors::Cors;
 use actix_web::http::header;
 use actix_web::web::Json;
 use actix_web::{error, get, post, web, App, HttpRequest, HttpServer, Result};
-use derive_more::{Display, Error};
+use derive_more::Display;
 use fastestserver::db::{
-    DBKeyValue, DBResponse, DBValueOnly, GameValue, LevelUpdate, MonthlyCheck, PartialRankUpdate,
-    PlayHistory, PlayingNow, PlayingTime, RankUpdate,
+    GameMongo, InGameNameMongo, LevelUpdate, LevelUpdateMongo, MonthlyCheck, MonthlyCheckAggregate,
+    PlayHistory, PlayHistoryMongo, PlayingNow, PlayingTime, RankUpdate, RankUpdateMongo,
 };
 use fastestserver::types::{
     AllLevelResponse, AllRankResponse, InsertLevelRequest, InsertRankRequest, InsertRequest,
     LevelResponse, MinecraftJoinedOrLeftRequest, RankResponse,
 };
+use futures::stream::TryStreamExt;
+use mongodb::bson::oid::ObjectId;
+use mongodb::bson::{doc, from_bson, Bson};
+use mongodb::options::ClientOptions;
+use mongodb::{Client, Database};
 use serde;
 
 #[derive(Debug, Clone)]
@@ -26,9 +31,7 @@ struct AppState {
 
 #[derive(Debug, Clone)]
 struct DBInfo {
-    prefix: String,
-    user: String,
-    pass: String,
+    db: mongodb::Database,
 }
 
 #[derive(Debug, Display)]
@@ -39,112 +42,82 @@ enum DBError {
 
 type DBResult<T> = std::result::Result<T, DBError>;
 
-fn conv_to_db_err<T>(_err: T) -> DBError {
+fn conv_to_db_err<T: Debug>(_err: T) -> DBError {
+    eprintln!("DBError: {:?}", _err);
     DBError::DBError("db error".to_owned())
 }
 
-fn conv_db_err<T>(_err: T) -> error::Error {
+fn conv_db_err<T: Debug>(_err: T) -> error::Error {
+    eprintln!("DBError: {:?}", _err);
     error::ErrorInternalServerError("db error")
 }
 
 impl actix_web::error::ResponseError for DBError {}
 
-#[derive(Debug, Clone, serde::Serialize)]
-pub struct DummyParams {}
-
-async fn db_get_params<T: for<'a> serde::Deserialize<'a>, P: serde::Serialize>(
-    info: &DBInfo,
-    endpoint: &str,
-    query_params: Option<P>,
-) -> DBResult<Vec<T>> {
-    let uri = format!("{}{}", &info.prefix, endpoint);
-    let client = awc::Client::default();
-
-    let mut req = client.get(uri).basic_auth(&info.user, &info.pass);
-    match query_params {
-        Some(query_params) => {
-            req = req.query(&query_params).map_err(|e| {
-                eprintln!("query param err: {:?}", &e);
-                conv_to_db_err(e)
-            })?;
-        }
-        _ => {}
-    }
-    let mut res = req.send().await.map_err(|e| {
-        eprintln!("get error: {:?}", &e);
-        conv_to_db_err(e)
-    })?;
-    let res = res.json::<DBResponse<T>>().await.map_err(|e| {
-        eprintln!("json parse error: {:?}", &e);
-        eprintln!("original response: {:?}", &res);
-        conv_to_db_err(e)
-    })?;
-
-    Ok(res.rows)
-}
-
-async fn db_get<T: for<'a> serde::Deserialize<'a>>(
-    info: &DBInfo,
-    endpoint: &str,
-) -> DBResult<Vec<T>> {
-    db_get_params::<T, DummyParams>(info, endpoint, None).await
-}
-
-async fn get_user_map(info: &DBInfo) -> DBResult<HashMap<String, String>> {
-    let users = db_get::<DBKeyValue<String, String>>(info, "/_design/nextpex/_view/users").await?;
-
-    let mut result = HashMap::new();
-    for user in &users {
-        result.insert(user.value.clone(), user.key.clone());
-    }
-    Ok(result)
-}
-
-async fn get_game_map(info: &DBInfo) -> DBResult<HashMap<String, String>> {
-    let games =
-        db_get::<DBKeyValue<String, GameValue>>(info, "/_design/nextpex/_view/games").await?;
-
-    let mut result = HashMap::new();
-    for game in &games {
-        result.insert(game.value.id.clone(), game.key.clone());
-    }
-    Ok(result)
-}
-
 #[get("/level/all")]
 async fn get_all_levels(data: web::Data<AppState>) -> Result<Json<AllLevelResponse>> {
-    let level_iter =
-        db_get::<DBValueOnly<LevelUpdate>>(&data.db_prefix, "/_design/nextpex/_view/level_updates")
-            .await
-            .map_err(conv_db_err)?;
-
-    let users = get_user_map(&data.db_prefix).await.map_err(conv_db_err)?;
+    let mut level_iter = data
+        .db_prefix
+        .db
+        .collection::<LevelUpdateMongo>("level_updates")
+        .aggregate(
+            [
+                // doc! {
+                //     "$sort": doc! {
+                //         "time": -1
+                //     }
+                // },
+                doc! {
+                    "$lookup": doc! {
+                        "from": "users",
+                        "localField": "user",
+                        "foreignField": "_id",
+                        "as": "username"
+                    }
+                },
+                doc! {
+                    "$unset": [
+                        "user",
+                        "old_level"
+                    ]
+                },
+                doc! {
+                    "$set": doc! {
+                        "username": doc! {
+                            "$getField": doc! {
+                                "field": "username",
+                                "input": doc! {
+                                    "$arrayElemAt": [
+                                        "$username",
+                                        0
+                                    ]
+                                }
+                            }
+                        },
+                        "level": "$new_level"
+                    }
+                },
+                doc! {
+                    "$unset": "new_level"
+                },
+            ],
+            None,
+        )
+        .await
+        .map_err(|e| conv_db_err(e))?;
 
     let mut level_map = std::collections::HashMap::<String, Vec<LevelResponse>>::new();
-    for level in level_iter {
-        let level = level.value;
-        let username = users.get(&level.user);
-        if username.is_none() {
-            continue;
-        }
-        let username = username.unwrap();
-        match level_map.get_mut(username) {
-            Some(v) => {
-                v.push(LevelResponse {
-                    level: level.level,
-                    time: level.time,
-                });
-            }
-            None => {
-                level_map.insert(
-                    username.clone(),
-                    vec![LevelResponse {
-                        level: level.level,
-                        time: level.time,
-                    }],
-                );
-            }
-        }
+    while let Some(doc) = level_iter.try_next().await.map_err(|e| conv_db_err(e))? {
+        let level: LevelUpdate = mongodb::bson::from_bson(mongodb::bson::Bson::Document(doc))
+            .map_err(|e| conv_db_err(e))?;
+        let response = LevelResponse {
+            level: level.level,
+            time: level.time.timestamp_millis() / 1000,
+        };
+        level_map
+            .entry(level.username.clone())
+            .or_insert_with(Vec::new)
+            .push(response);
     }
     Ok(web::Json(AllLevelResponse { levels: level_map }))
 }
@@ -165,40 +138,82 @@ async fn get_all_ranks(
         "/_design/nextpex/_view/rank_arena_updates"
     };
 
-    let rank_iter = db_get::<DBValueOnly<RankUpdate>>(&data.db_prefix, endpoint)
+    let mut rank_iter = data
+        .db_prefix
+        .db
+        .collection::<RankUpdateMongo>("rank_updates")
+        .aggregate(
+            [
+                doc! {
+                    "$match": doc! {
+                        "rank_type": rank_type
+                    }
+                },
+                doc! {
+                    "$unset": [
+                        "old_rank",
+                        "old_rank_name"
+                    ]
+                },
+                doc! {
+                    "$set": doc! {
+                        "rank": "$new_rank",
+                        "rank_name": "$new_rank_name"
+                    }
+                },
+                doc! {
+                    "$unset": [
+                        "new_rank",
+                        "new_rank_name"
+                    ]
+                },
+                doc! {
+                    "$lookup": doc! {
+                        "from": "users",
+                        "localField": "user",
+                        "foreignField": "_id",
+                        "as": "username"
+                    }
+                },
+                doc! {
+                    "$set": doc! {
+                        "username": doc! {
+                            "$getField": doc! {
+                                "input": doc! {
+                                    "$first": "$username"
+                                },
+                                "field": "username"
+                            }
+                        }
+                    }
+                },
+                doc! {
+                    "$unset": [
+                        "user",
+                        "rank_type"
+                    ]
+                },
+            ],
+            None,
+        )
         .await
-        .map_err(conv_db_err)?;
-
-    let users = get_user_map(&data.db_prefix).await.map_err(conv_db_err)?;
+        .map_err(|e| conv_db_err(e))?;
 
     let mut rank_map = std::collections::HashMap::<String, Vec<RankResponse>>::new();
-    for rank in rank_iter {
-        let rank = rank.value;
-        let username = users.get(&rank.user);
-        if username.is_none() {
-            continue;
-        }
-        let username = username.unwrap();
-        match rank_map.get_mut(username) {
-            Some(v) => {
-                v.push(RankResponse {
-                    rank: rank.rank,
-                    rank_name: rank.rank_name,
-                    time: rank.time,
-                });
-            }
-            None => {
-                rank_map.insert(
-                    username.clone(),
-                    vec![RankResponse {
-                        rank: rank.rank,
-                        rank_name: rank.rank_name,
-                        time: rank.time,
-                    }],
-                );
-            }
-        }
+    while let Some(doc) = rank_iter.try_next().await.map_err(|e| conv_db_err(e))? {
+        let rank: RankUpdate = mongodb::bson::from_bson(mongodb::bson::Bson::Document(doc))
+            .map_err(|e| conv_db_err(e))?;
+        let response = RankResponse {
+            rank: rank.rank,
+            rank_name: rank.rank_name,
+            time: rank.time.timestamp_millis() / 1000,
+        };
+        rank_map
+            .entry(rank.username.clone())
+            .or_insert_with(Vec::new)
+            .push(response);
     }
+
     Ok(web::Json(AllRankResponse { ranks: rank_map }))
 }
 
@@ -241,63 +256,195 @@ async fn get_latest_game_sessions(
 ) -> Result<Json<Vec<PlayingTime>>> {
     let limit = limit.limit.unwrap_or(20);
 
-    let histories = db_get_params::<DBValueOnly<PlayHistory>, PlayHistoryQueryParam>(
-        &data.db_prefix,
-        "/_design/nextpex/_view/play_history",
-        Some(PlayHistoryQueryParam {
-            limit: limit,
-            descending: true,
-        }),
-    )
-    .await
-    .map_err(conv_db_err)?;
-
-    let users = get_user_map(&data.db_prefix).await.map_err(conv_db_err)?;
-    let games = get_game_map(&data.db_prefix).await.map_err(conv_db_err)?;
-
-    let playing_times = histories
-        .iter()
-        .filter_map(|h| {
-            let h = &h.value;
-            let username = users.get(&h.user);
-            if username.is_none() {
-                return None;
+    let agg = [
+        doc! {
+            "$sort": doc! {
+                "started_at": -1
             }
-            let gamename = games.get(&h.game);
-            if gamename.is_none() {
-                return None;
+        },
+        doc! {
+            "$limit": limit
+        },
+        doc! {
+            "$lookup": doc! {
+                "from": "users",
+                "localField": "user",
+                "foreignField": "_id",
+                "as": "username"
             }
-            Some(PlayingTime {
-                username: username.unwrap().clone(),
-                gamename: gamename.unwrap().clone(),
-                started_at: *h.started_at.get(0).unwrap() as i64,
-                ended_at: *h.ended_at.get(0).unwrap() as i64,
-            })
-        })
-        .collect();
+        },
+        doc! {
+            "$set": doc! {
+                "username": doc! {
+                    "$getField": doc! {
+                        "input": doc! {
+                            "$first": "$username"
+                        },
+                        "field": "username"
+                    }
+                }
+            }
+        },
+        doc! {
+            "$lookup": doc! {
+                "from": "games",
+                "localField": "game",
+                "foreignField": "_id",
+                "as": "gamename"
+            }
+        },
+        doc! {
+            "$set": doc! {
+                "gamename": doc! {
+                    "$getField": doc! {
+                        "input": doc! {
+                            "$first": "$gamename"
+                        },
+                        "field": "name"
+                    }
+                }
+            }
+        },
+        doc! {
+            "$unset": [
+                "user",
+                "game"
+            ]
+        },
+    ];
+
+    let mut docs = data
+        .db_prefix
+        .db
+        .collection::<PlayHistoryMongo>("play_history")
+        .aggregate(agg, None)
+        .await
+        .map_err(conv_db_err)?;
+
+    let mut playing_times: Vec<PlayingTime> = Vec::new();
+    while let Some(doc) = docs.try_next().await.map_err(conv_db_err)? {
+        let history: PlayHistory = from_bson(Bson::Document(doc)).map_err(conv_db_err)?;
+
+        playing_times.push(PlayingTime {
+            username: history.username,
+            gamename: history.gamename,
+            started_at: history.started_at.timestamp_millis() / 1000,
+            ended_at: history.ended_at.timestamp_millis() / 1000,
+        });
+    }
 
     Ok(web::Json(playing_times))
 }
 
 #[get("/check/monthly")]
 async fn get_monthly_playing_time(data: web::Data<AppState>) -> Result<Json<Vec<MonthlyCheck>>> {
-    unimplemented!()
-    // let histories =
-    //     db_get::<PlayHistory>(&data.db_prefix, "/_design/nextpex/_view/play_history", "")
-    //         .await
-    //         .map_err(conv_db_err)?;
+    let agg = [
+        doc! {
+            "$lookup": doc! {
+                "from": "users",
+                "localField": "user",
+                "foreignField": "_id",
+                "as": "username"
+            }
+        },
+        doc! {
+            "$set": doc! {
+                "username": doc! {
+                    "$getField": doc! {
+                        "input": doc! {
+                            "$first": "$username"
+                        },
+                        "field": "username"
+                    }
+                }
+            }
+        },
+        doc! {
+            "$lookup": doc! {
+                "from": "games",
+                "localField": "game",
+                "foreignField": "_id",
+                "as": "gamename"
+            }
+        },
+        doc! {
+            "$set": doc! {
+                "gamename": doc! {
+                    "$getField": doc! {
+                        "input": doc! {
+                            "$first": "$gamename"
+                        },
+                        "field": "name"
+                    }
+                }
+            }
+        },
+        doc! {
+            "$unset": [
+                "user",
+                "game"
+            ]
+        },
+        doc! {
+            "$addFields": doc! {
+                "playtime": doc! {
+                    "$dateDiff": doc! {
+                        "startDate": "$started_at",
+                        "endDate": "$ended_at",
+                        "unit": "second"
+                    }
+                },
+                "year": doc! {
+                    "$year": "$started_at"
+                },
+                "month": doc! {
+                    "$month": "$started_at"
+                }
+            }
+        },
+        doc! {
+            "$unset": [
+                "started_at",
+                "ended_at"
+            ]
+        },
+        doc! {
+            "$group": doc! {
+                "_id": doc! {
+                    "year": "$year",
+                    "month": "$month",
+                    "username": "$username",
+                    "gamename": "$gamename"
+                },
+                "playtime": doc! {
+                    "$sum": "$playtime"
+                }
+            }
+        },
+    ];
 
-    // let playingTimes = histories
-    //     .iter()
-    //     .map(|h| PlayingTime {
-    //         username: h.user.clone(),
-    //         gamename: h.game.clone(),
-    //         started_at: *h.started_at.get(0).unwrap() as i64,
-    //         ended_at: *h.ended_at.get(0).unwrap() as i64,
-    //     })
-    //     .collect();
+    let mut docs = data
+        .db_prefix
+        .db
+        .collection::<PlayHistoryMongo>("play_history")
+        .aggregate(agg, None)
+        .await
+        .map_err(conv_db_err)?;
 
-    // Ok(web::Json(playingTimes))
+    let mut monthly_checks: Vec<MonthlyCheck> = Vec::new();
+    while let Some(doc) = docs.try_next().await.map_err(conv_db_err)? {
+        let history: MonthlyCheckAggregate = from_bson(Bson::Document(doc)).map_err(conv_db_err)?;
+
+        monthly_checks.push(MonthlyCheck {
+            username: history._id.username,
+            gamename: history._id.gamename,
+            year: history._id.year,
+            month: history._id.month,
+            playtime: history.playtime,
+        });
+    }
+
+    Ok(web::Json(monthly_checks))
 }
 
 // type DBPool = r2d2::Pool<SqliteConnectionManager>;
@@ -318,31 +465,37 @@ async fn get_monthly_playing_time(data: web::Data<AppState>) -> Result<Json<Vec<
 //     }
 // }
 
-async fn get_username_from_ingamename(in_game_name: &str) -> Result<Option<String>> {
-    unimplemented!()
-    // let mut stmt = db
-    //     .prepare("select username from ingamename where ingamename=?")
-    //     .map_err(conv_db_err)?;
-    // let mut rows = stmt
-    //     .query_map([in_game_name], |row| Ok(row.get_unwrap(0)))
-    //     .map_err(conv_db_err)?;
-    // let row = rows.next();
-    // match row {
-    //     Some(row) => Ok(Some(row.unwrap())),
-    //     None => Ok(None),
-    // }
+async fn get_username_from_ingamename(
+    in_game_name: &str,
+    db: &Database,
+) -> Result<Option<ObjectId>> {
+    let user_id = db
+        .collection::<InGameNameMongo>("in_game_names")
+        .find_one(
+            doc! {
+                "in_game_name": in_game_name
+            },
+            None,
+        )
+        .await
+        .map_err(conv_db_err)?;
+
+    Ok(user_id.map(|u| u.user))
 }
 
-async fn game_existence_check(game_name: &str) -> Result<bool> {
-    unimplemented!()
-    // let mut stmt = db
-    //     .prepare("select gamename from game where gamename=?")
-    //     .map_err(conv_db_err)?;
-    // let mut rows = stmt
-    //     .query_map([game_name], |row| Ok(row.get_unwrap::<usize, String>(0)))
-    //     .map_err(conv_db_err)?;
-    // let row = rows.next();
-    // Ok(row.is_some())
+async fn game_existence_check(game_name: &str, db: &Database) -> Result<bool> {
+    let user_id = db
+        .collection::<GameMongo>("games")
+        .find_one(
+            doc! {
+                "name": game_name
+            },
+            None,
+        )
+        .await
+        .map_err(conv_db_err)?;
+
+    Ok(user_id.is_some())
 }
 
 #[post("/check")]
@@ -475,26 +628,6 @@ async fn insert_rank_update(
     // Ok("".to_string())
 }
 
-fn conv_zmq_err<T>(_err: T) -> error::Error {
-    error::ErrorInternalServerError("internal IPC error")
-}
-
-fn make_requester(zmq_conn: &(String, i32)) -> Result<zmq::Socket> {
-    let context = zmq::Context::new();
-    let requester = context.socket(zmq::REQ).unwrap();
-
-    let conn = format!("tcp://{}:{}", zmq_conn.0, zmq_conn.1);
-
-    Err(conv_zmq_err(requester.connect(&conn)))
-}
-
-fn validate_zmq_response(msg: &zmq::Message) -> bool {
-    match msg.as_str() {
-        None => false,
-        Some(s) => s == "ok",
-    }
-}
-
 #[post("/minecraft/joined")]
 async fn minecraft_joined(
     data: web::Data<AppState>,
@@ -579,6 +712,10 @@ async fn minecraft_left(
 async fn main() -> std::io::Result<()> {
     env_logger::init();
 
+    let mut client_options = ClientOptions::parse("mongodb://localhost:27017/nextpex?w=majority")
+        .await
+        .unwrap();
+
     HttpServer::new(move || {
         let cors = Cors::default()
             .allowed_origin_fn(|_origin, _req_head| true)
@@ -594,13 +731,12 @@ async fn main() -> std::io::Result<()> {
             .parse::<i32>()
             .expect("BOT_PORT is not integer");
 
+        let client = Client::with_options(client_options.clone()).unwrap();
+        let db = client.database("nextpex");
+
         App::new()
             .app_data(web::Data::new(AppState {
-                db_prefix: DBInfo {
-                    prefix: "http://localhost:5984/nextpex".to_owned(),
-                    user: "admin".to_owned(),
-                    pass: "admin".to_owned(),
-                },
+                db_prefix: DBInfo { db: db },
                 bot_conn: (bot_addr, bot_port),
             }))
             .wrap(cors)

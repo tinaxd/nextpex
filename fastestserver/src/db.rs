@@ -1,19 +1,43 @@
-use serde;
+use mongodb::bson::{oid::ObjectId, DateTime};
+use serde::{self, Deserialize, Serialize};
 
-#[derive(Debug, Clone, serde::Deserialize)]
-pub struct DBResponse<T> {
-    pub rows: Vec<T>,
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct GameMongo {
+    pub name: String,
+    pub checked: bool,
 }
 
-#[derive(Debug, Clone, serde::Deserialize)]
-pub struct DBValueOnly<T> {
-    pub value: T,
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct LevelUpdateMongo {
+    pub user: ObjectId,
+    pub old_level: i32,
+    pub new_level: i32,
+    pub time: DateTime,
 }
 
-#[derive(Debug, Clone, serde::Deserialize)]
-pub struct DBKeyValue<K, V> {
-    pub key: K,
-    pub value: V,
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct RankUpdateMongo {
+    pub user: ObjectId,
+    pub old_rank: i32,
+    pub old_rank_name: String,
+    pub new_rank: i32,
+    pub new_rank_name: String,
+    pub time: DateTime,
+    pub rank_type: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct PlayHistoryMongo {
+    pub user: ObjectId,
+    pub game: ObjectId,
+    pub started_at: DateTime,
+    pub ended_at: DateTime,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct InGameNameMongo {
+    pub user: ObjectId,
+    pub in_game_name: String,
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -25,24 +49,38 @@ pub struct GameValue {
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct LevelUpdate {
     pub level: i32,
-    pub time: i64,
-    pub user: String,
+    pub time: DateTime,
+    pub username: String,
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct RankUpdate {
-    pub user: String,
+    pub username: String,
     pub rank: i32,
     pub rank_name: String,
-    pub time: i64,
+    pub time: DateTime,
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct PlayHistory {
-    pub user: String,
-    pub game: String,
-    pub started_at: Vec<i32>,
-    pub ended_at: Vec<i32>,
+    pub username: String,
+    pub gamename: String,
+    pub started_at: DateTime,
+    pub ended_at: DateTime,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct MonthlyCheckAggregate {
+    pub _id: MonthlyCheckAggregateValue,
+    pub playtime: i64,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct MonthlyCheckAggregateValue {
+    pub year: i32,
+    pub month: i32,
+    pub username: String,
+    pub gamename: String,
 }
 
 #[derive(Debug, Clone)]
