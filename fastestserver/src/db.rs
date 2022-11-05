@@ -5,6 +5,7 @@ use serde::{self, Deserialize, Serialize};
 pub struct GameMongo {
     pub name: String,
     pub checked: bool,
+    pub _id: ObjectId,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -31,7 +32,7 @@ pub struct PlayHistoryMongo {
     pub user: ObjectId,
     pub game: ObjectId,
     pub started_at: DateTime,
-    pub ended_at: DateTime,
+    pub ended_at: Option<DateTime>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -67,6 +68,13 @@ pub struct PlayHistory {
     pub gamename: String,
     pub started_at: DateTime,
     pub ended_at: DateTime,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct PlayNow {
+    pub username: String,
+    pub gamename: String,
+    pub started_at: DateTime,
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
