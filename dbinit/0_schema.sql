@@ -1,17 +1,20 @@
 CREATE TABLE IF NOT EXISTS "user"(username VARCHAR(64) PRIMARY KEY);
 CREATE TABLE IF NOT EXISTS ingamename(
     ingamename VARCHAR(64) PRIMARY KEY,
-    username VARCHAR(64) REFERENCES "user"(username) ON DELETE CASCADE
+    username VARCHAR(64) REFERENCES "user"(username) ON DELETE CASCADE ON UPDATE CASCADE
 );
-CREATE TABLE IF NOT EXISTS game(gamename VARCHAR(128) PRIMARY KEY);
+CREATE TABLE IF NOT EXISTS game(
+    gamename VARCHAR(128) PRIMARY KEY,
+    is_checked BOOLEAN NOT NULL DEFAULT TRUE
+);
 CREATE TABLE IF NOT EXISTS levelupdate(
-    username VARCHAR(64) NOT NULL REFERENCES "user"(username) ON DELETE CASCADE,
+    username VARCHAR(64) NOT NULL REFERENCES "user"(username) ON DELETE CASCADE ON UPDATE CASCADE,
     oldlevel INTEGER,
     newlevel INTEGER NOT NULL,
     timeat TIMESTAMP NOT NULL
 );
 CREATE TABLE IF NOT EXISTS rankupdate(
-    username VARCHAR(64) NOT NULL REFERENCES "user"(username) ON DELETE CASCADE,
+    username VARCHAR(64) NOT NULL REFERENCES "user"(username) ON DELETE CASCADE ON UPDATE CASCADE,
     oldrank INTEGER,
     oldrankname VARCHAR(32),
     newrank INTEGER NOT NULL,
@@ -20,16 +23,11 @@ CREATE TABLE IF NOT EXISTS rankupdate(
     timeat TIMESTAMP NOT NULL
 );
 CREATE TABLE IF NOT EXISTS playingtime(
-    username VARCHAR(64) NOT NULL REFERENCES "user"(username) ON DELETE CASCADE,
+    username VARCHAR(64) NOT NULL REFERENCES "user"(username) ON DELETE CASCADE ON UPDATE CASCADE,
     gamename VARCHAR(128) REFERENCES game(gamename) ON DELETE
-    SET NULL,
+    SET NULL ON UPDATE CASCADE,
         startedat TIMESTAMP NOT NULL,
-        endedat TIMESTAMP NOT NULL
-);
-CREATE TABLE IF NOT EXISTS playingnow(
-    username VARCHAR(64) NOT NULL PRIMARY KEY REFERENCES "user"(username) ON DELETE CASCADE,
-    gamename VARCHAR(128) NOT NULL REFERENCES game(gamename) ON DELETE CASCADE,
-    startedat TIMESTAMP NOT NULL
+        endedat TIMESTAMP NULL
 );
 CREATE VIEW monthlycheck AS
 select username,
@@ -44,6 +42,7 @@ select username,
         from startedat
     ) as year
 from playingtime
+where endedat is not null
 group by username,
     gamename,
     month,
@@ -65,5 +64,3 @@ CREATE TABLE IF NOT EXISTS bot_activity (
     userid INTEGER NOT NULL PRIMARY KEY,
     activity varchar(128) NOT NULL
 );
-ALTER TABLE game
-ADD COLUMN is_checked BOOLEAN NOT NULL DEFAULT TRUE;
