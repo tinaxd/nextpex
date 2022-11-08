@@ -1,6 +1,9 @@
 package main
 
-import "database/sql"
+import (
+	"database/sql"
+	"time"
+)
 
 type User struct {
 	Username string `db:"username"`
@@ -19,7 +22,7 @@ type LevelUpdate struct {
 	Username string        `db:"username"`
 	OldLevel sql.NullInt32 `db:"oldlevel"`
 	NewLevel int           `db:"newlevel"`
-	TimeAt   int           `db:"timeat"`
+	TimeAt   time.Time     `db:"timeat"`
 }
 
 type RankUpdate struct {
@@ -29,26 +32,26 @@ type RankUpdate struct {
 	OldRankName sql.NullString `db:"oldrankname"`
 	NewRankName string         `db:"newrankname"`
 	RankType    string         `db:"ranktype"`
-	TimeAt      int            `db:"timeat"`
+	TimeAt      time.Time      `db:"timeat"`
 }
 
-type PlayingTime struct {
+type PlayingTimeWithoutEndedAt struct {
 	Username  string `db:"username" json:"username"`
 	GameName  string `db:"gamename" json:"gamename"`
-	StartedAt int    `db:"startedat" json:"started_at"`
-	EndedAt   int    `db:"endedat" json:"ended_at"`
+	StartedAt int64  `db:"startedat" json:"started_at"`
 }
 
-type PlayingNow struct {
+type PlayingTimeWithEndedAt struct {
 	Username  string `db:"username" json:"username"`
 	GameName  string `db:"gamename" json:"gamename"`
-	StartedAt int    `db:"startedat" json:"started_at"`
+	StartedAt int64  `db:"startedat" json:"started_at"`
+	EndedAt   int64  `db:"endedat" json:"ended_at"`
 }
 
 type MonthlyCheck struct {
-	Username string `db:"username" json:"username"`
-	GameName string `db:"gamename" json:"gamename"`
-	Month    int    `db:"month" json:"month"`
-	Year     int    `db:"year" json:"year"`
-	Playtime int    `db:"playtime" json:"playtime"` // in seconds
+	Username string  `db:"username" json:"username"`
+	GameName string  `db:"gamename" json:"gamename"`
+	Month    int     `db:"month" json:"month"`
+	Year     int     `db:"year" json:"year"`
+	Playtime float64 `db:"playtime" json:"playtime"` // in seconds
 }
