@@ -94,7 +94,108 @@ func main() {
 // This function will be called (due to AddHandler above) every time a new
 // message is created on any channel that the authenticated bot has access to.
 func presenceUpdate(s *discordgo.Session, p *discordgo.PresenceUpdate) {
-	fmt.Println(p)
+	prevGame, err := getLastGameOfUser(p.User)
+	if err != nil {
+		log.Printf("presence update err: %v", err)
+		return
+	}
+	newGame := extractGameFromActivities(p.Presence.Activities)
+
+	log.Printf("prevGame: %s, newGame: %s", prevGame, newGame)
+	if prevGame == "" && newGame != "" {
+		// start
+		checked, err := isCheckedGame(newGame)
+		if err != nil {
+			log.Printf("presence update err: %v", err)
+			return
+		}
+		if !checked {
+			return
+		}
+
+		if _, err := db.Exec("INSERT INTO bot_activity (user_id, activity) VALUES ($1, $2) ON CONFLICT(user_id) DO UPDATE SET activity=$3", p.User.ID, newGame, newGame); err != nil {
+			log.Printf("presence update err: %v", err)
+			return
+		}
+
+		if err := sendApexabilityCheckByUser(s, p.GuildID, p.User, newGame, true); err != nil {
+			log.Printf("presence update err: %v", err)
+			return
+		}
+		if err := insertCheck(p.User.Username, newGame, true); err != nil {
+			log.Printf("presence update err: %v", err)
+			return
+		}
+	} else if prevGame != "" && newGame == "" {
+		// stop
+		checked, err := isCheckedGame(prevGame)
+		if err != nil {
+			log.Printf("presence update err: %v", err)
+			return
+		}
+		if !checked {
+			return
+		}
+
+		if _, err := db.Exec("DELETE FROM bot_activity WHERE user_id=$1", p.User.ID); err != nil {
+			log.Printf("presence update err: %v", err)
+			return
+		}
+
+		if err := sendApexabilityCheckByUser(s, p.GuildID, p.User, prevGame, false); err != nil {
+			log.Printf("presence update err: %v", err)
+			return
+		}
+		if err := insertCheck(p.User.Username, prevGame, false); err != nil {
+			log.Printf("presence update err: %v", err)
+			return
+		}
+	} else if prevGame != "" && newGame != "" && prevGame != newGame {
+		checked, err := isCheckedGame(newGame)
+		if err != nil {
+			log.Printf("presence update err: %v", err)
+			return
+		}
+		if !checked {
+			return
+		}
+
+		if _, err := db.Exec("INSERT INTO bot_activity (user_id, activity) VALUES ($1, $2) ON CONFLICT(user_id) DO UPDATE SET activity=$3", p.User.ID, newGame, newGame); err != nil {
+			log.Printf("presence update err: %v", err)
+			return
+		}
+	} else {
+		return
+	}
+}
+
+func extractGameFromActivities(activities []*discordgo.Activity) string {
+	for _, activity := range activities {
+		if activity.Type == discordgo.ActivityTypeGame {
+			return activity.Name
+		}
+	}
+	return ""
+}
+
+func getLastGameOfUser(user *discordgo.User) (string, error) {
+	var games []string
+	if err := db.Select(&games, "SELECT activity FROM bot_activity WHERE user_id=$1", user.ID); err != nil {
+		return "", err
+	}
+
+	if len(games) == 0 {
+		return "", nil
+	}
+	return games[0], nil
+}
+
+func isCheckedGame(gameName string) (bool, error) {
+	var count int
+	if err := db.Get(&count, "SELECT COUNT(*) FROM game WHERE gamename=$1 AND is_checked=true", gameName); err != nil {
+		return false, err
+	}
+	return count > 0, nil
 }
 
 func ready(s *discordgo.Session, r *discordgo.Ready) {
@@ -155,6 +256,11 @@ func handleReactionUpdate(s *discordgo.Session, r *discordgo.MessageReaction, me
 		log.Printf("reactionAdd error: %v", err)
 		return
 	}
+
+	if err := insertCheck(member.User.Username, gameName, isAdd); err != nil {
+		log.Printf("reactionAdd update err: %v", err)
+		return
+	}
 }
 
 func buildMessageText(member *discordgo.Member, gameName string, isStart bool) string {
@@ -169,6 +275,26 @@ func buildMessageText(member *discordgo.Member, gameName string, isStart bool) s
 		name = member.User.Username
 	}
 	return fmt.Sprintf("%s が %s %s", name, gameName, tail)
+}
+
+func sendApexabilityCheckByUser(s *discordgo.Session, guildID string, user *discordgo.User, gameName string, isStart bool) error {
+	checkChan, err := findTextChannel(s, guildID, CheckChan)
+	if err != nil {
+		return err
+	}
+
+	if checkChan == nil {
+		return errors.New("apexability-check channel not found")
+	}
+
+	member, err := s.GuildMember(guildID, user.ID)
+	if err != nil {
+		return err
+	}
+
+	content := buildMessageText(member, gameName, isStart)
+	_, err = s.ChannelMessageSend(checkChan.ID, content)
+	return err
 }
 
 func sendApexabilityCheck(s *discordgo.Session, guildID string, member *discordgo.Member, gameName string, isStart bool) error {

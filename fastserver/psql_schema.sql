@@ -65,6 +65,6 @@ CREATE TABLE IF NOT EXISTS user_data (
     last_update INTEGER
 );
 CREATE TABLE IF NOT EXISTS bot_activity (
-    userid INTEGER NOT NULL PRIMARY KEY,
+    user_id VARCHAR(64) NOT NULL PRIMARY KEY,
     activity varchar(128) NOT NULL
 );

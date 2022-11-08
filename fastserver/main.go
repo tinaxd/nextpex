@@ -138,7 +138,7 @@ func getMonthlyPlayingTime(c echo.Context) error {
 
 func getUsernameFromInGameName(inGameName string) (string, bool) {
 	var username string
-	err := db.Get(&username, `select username from ingamename where ingamename=?`, inGameName)
+	err := db.Get(&username, `select username from ingamename where ingamename=$1`, inGameName)
 	if err != nil {
 		return "", false
 	}
@@ -188,14 +188,18 @@ func insertCheck(c echo.Context) error {
 			if err != nil {
 				return err
 			}
-			tx.Commit()
+			if err := tx.Commit(); err != nil {
+				return err
+			}
 		} else {
 			// if an entry already exists, update the startedat field
 			_, err := tx.Exec("UPDATE playingtime WHERE id=$1 SET gamename=$2, startedat=$3", result[0].ID, req.GameName, time.Unix(int64(req.Time), 0))
 			if err != nil {
 				return err
 			}
-			tx.Commit()
+			if err := tx.Commit(); err != nil {
+				return err
+			}
 		}
 
 		return c.NoContent(http.StatusOK)
@@ -341,7 +345,7 @@ func main() {
 	e.GET("/check/history", getLatestGameSessions)
 	e.GET("/check/monthly", getMonthlyPlayingTime)
 
-	e.POST("/check", insertCheck)
+	// e.POST("/check", insertCheck)
 	e.POST("/level", insertLevelUpdate)
 	e.POST("/rank", insertRankUpdate)
 
