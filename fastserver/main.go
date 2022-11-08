@@ -1,14 +1,17 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
+	"os"
 	"strconv"
+	"time"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 
-	_ "github.com/mattn/go-sqlite3"
+	_ "github.com/lib/pq"
 )
 
 var (
@@ -26,9 +29,9 @@ type AllLevelResponse struct {
 
 func getAllLevels(c echo.Context) error {
 	var levels []struct {
-		Level    int    `db:"newlevel"`
-		Time     int    `db:"timeat"`
-		Username string `db:"username"`
+		Level    int       `db:"newlevel"`
+		Time     time.Time `db:"timeat"`
+		Username string    `db:"username"`
 	}
 	err := db.Select(&levels, `select username,newlevel,timeat from levelupdate order by timeat desc`)
 	if err != nil {
@@ -39,11 +42,14 @@ func getAllLevels(c echo.Context) error {
 	for _, l := range levels {
 		levelMap[l.Username] = append(levelMap[l.Username], LevelResponse{
 			Level:  l.Level,
-			TimeAt: int(l.Time),
+			TimeAt: int(l.Time.Unix()),
 		})
 	}
 
-	return c.JSON(http.StatusOK, levelMap)
+	response := make(map[string]interface{})
+	response["levels"] = levelMap
+
+	return c.JSON(http.StatusOK, response)
 }
 
 type RankResponse struct {
@@ -64,12 +70,12 @@ func getAllRanks(c echo.Context) error {
 	}
 
 	var ranks []struct {
-		Rank     int    `db:"newrank"`
-		RankName string `db:"newrankname"`
-		Time     int    `db:"timeat"`
-		Username string `db:"username"`
+		Rank     int       `db:"newrank"`
+		RankName string    `db:"newrankname"`
+		Time     time.Time `db:"timeat"`
+		Username string    `db:"username"`
 	}
-	err := db.Select(&ranks, `select username,newrank,newrankname,timeat from rankupdate where ranktype=? order by timeat desc`, rankType)
+	err := db.Select(&ranks, `select username,newrank,newrankname,timeat from rankupdate where ranktype=$1 order by timeat desc`, rankType)
 	if err != nil {
 		return err
 	}
@@ -79,16 +85,19 @@ func getAllRanks(c echo.Context) error {
 		rankMap[r.Username] = append(rankMap[r.Username], RankResponse{
 			Rank:     r.Rank,
 			RankName: r.RankName,
-			TimeAt:   r.Time,
+			TimeAt:   int(r.Time.Unix()),
 		})
 	}
 
-	return c.JSON(http.StatusOK, rankMap)
+	response := make(map[string]interface{})
+	response["ranks"] = rankMap
+
+	return c.JSON(http.StatusOK, response)
 }
 
 func getNowPlaying(c echo.Context) error {
-	var nowPlaying []PlayingNow
-	err := db.Select(&nowPlaying, `select username,gamename,startedat from playingnow order by startedat desc`)
+	var nowPlaying []PlayingTimeWithoutEndedAt
+	err := db.Select(&nowPlaying, `select username,gamename,ROUND(EXTRACT(epoch FROM startedat)) AS startedat from playingtime where endedat IS NULL order by startedat desc`)
 	if err != nil {
 		return err
 	}
@@ -97,7 +106,7 @@ func getNowPlaying(c echo.Context) error {
 }
 
 func getLatestGameSessions(c echo.Context) error {
-	var sessions []PlayingTime
+	var sessions []PlayingTimeWithEndedAt
 
 	// limit
 	limit := 20
@@ -109,7 +118,7 @@ func getLatestGameSessions(c echo.Context) error {
 		}
 	}
 
-	err := db.Select(&sessions, "select username,gamename,startedat,endedat from playingtime order by endedat desc limit ?", limit)
+	err := db.Select(&sessions, "select username,gamename,ROUND(EXTRACT(epoch FROM startedat)) AS startedat,ROUND(EXTRACT(epoch FROM endedat)) AS endedat from playingtime where endedat IS NOT NULL order by endedat desc limit $1", limit)
 	if err != nil {
 		return err
 	}
@@ -119,7 +128,7 @@ func getLatestGameSessions(c echo.Context) error {
 
 func getMonthlyPlayingTime(c echo.Context) error {
 	var monthlyChecks []MonthlyCheck
-	err := db.Select(&monthlyChecks, `select * from monthlycheck`)
+	err := db.Select(&monthlyChecks, `select username,gamename,EXTRACT(epoch FROM playtime) AS playtime,year,month from monthlycheck`)
 	if err != nil {
 		return err
 	}
@@ -129,7 +138,7 @@ func getMonthlyPlayingTime(c echo.Context) error {
 
 func getUsernameFromInGameName(inGameName string) (string, bool) {
 	var username string
-	err := db.Get(&username, `select username from ingamename where ingamename=?`, inGameName)
+	err := db.Get(&username, `select username from ingamename where ingamename=$1`, inGameName)
 	if err != nil {
 		return "", false
 	}
@@ -158,10 +167,39 @@ func insertCheck(c echo.Context) error {
 
 	if req.Type == "start" {
 		// insert into playingnow table
-		// if an entry already exists, update the startedat field
-		_, err := db.Exec(`insert into playingnow (username,gamename,startedat) values (?,?,?) ON CONFLICT(username) DO UPDATE SET gamename=?, startedat=?`, username, req.GameName, req.Time, req.GameName, req.Time)
+		tx, err := db.Beginx()
 		if err != nil {
 			return err
+		}
+		defer tx.Rollback()
+
+		// if already exists, update startedat
+		var result []struct {
+			ID int `db:"id"`
+		}
+		err = tx.Select(&result, "select id from playingtime where username=$1 and endedat is null FOR UPDATE", username)
+		if err != nil {
+			return err
+		}
+
+		if len(result) == 0 {
+			// entry does not exist, insert
+			_, err := tx.Exec("INSERT INTO playingtime(username,gamename,startedat,endedat) VALUES($1,$2,$3,NULL)", username, req.GameName, time.Unix(int64(req.Time), 0))
+			if err != nil {
+				return err
+			}
+			if err := tx.Commit(); err != nil {
+				return err
+			}
+		} else {
+			// if an entry already exists, update the startedat field
+			_, err := tx.Exec("UPDATE playingtime WHERE id=$1 SET gamename=$2, startedat=$3", result[0].ID, req.GameName, time.Unix(int64(req.Time), 0))
+			if err != nil {
+				return err
+			}
+			if err := tx.Commit(); err != nil {
+				return err
+			}
 		}
 
 		return c.NoContent(http.StatusOK)
@@ -173,8 +211,12 @@ func insertCheck(c echo.Context) error {
 		defer tx.Rollback()
 
 		// retrieve start info from playingnow table
-		var startInfo PlayingNow
-		if err := tx.Get(&startInfo, `select * from playingnow where username=?`, username); err != nil {
+		type PlayingTimeWithID struct {
+			ID int `db:"id"`
+			PlayingTimeWithEndedAt
+		}
+		var startInfo PlayingTimeWithID
+		if err := tx.Get(&startInfo, `select id,gamename from playingtime where username=$1 AND endedat IS NULL FOR UPDATE`, username); err != nil {
 			c.Logger().Error(err)
 			return c.String(http.StatusNotFound, "start entry not found")
 		}
@@ -184,13 +226,8 @@ func insertCheck(c echo.Context) error {
 			return c.String(http.StatusBadRequest, "game name does not match with start info")
 		}
 
-		// delete from playingnow table
-		if _, err := tx.Exec(`delete from playingnow where username=?`, username); err != nil {
-			return err
-		}
-
 		// insert into playingtime table
-		_, err = tx.Exec(`insert into playingtime (username,gamename,startedat,endedat) values (?,?,?,?)`, username, req.GameName, startInfo.StartedAt, req.Time)
+		_, err = tx.Exec("UPDATE playingtime WHERE id=$1 SET endedat=$2", startInfo.ID, time.Unix(int64(req.Time), 0))
 		if err != nil {
 			return err
 		}
@@ -226,7 +263,7 @@ func insertLevelUpdate(c echo.Context) error {
 	}
 
 	// insert into levelupdate table
-	_, err := db.Exec(`insert into levelupdate (username,oldlevel,newlevel,timeat) values (?,?,?,?)`, username, req.OldLevel, req.NewLevel, req.Time)
+	_, err := db.Exec(`insert into levelupdate (username,oldlevel,newlevel,timeat) values ($1,$2,$3,$4)`, username, req.OldLevel, req.NewLevel, time.Unix(int64(req.Time), 0))
 	if err != nil {
 		return err
 	}
@@ -258,7 +295,7 @@ func insertRankUpdate(c echo.Context) error {
 	}
 
 	// insert into rankupdate table
-	_, err := db.Exec(`insert into rankupdate (username,oldrank,oldrankname,newrank,newrankname,timeat,ranktype) values (?,?,?,?,?,?,?)`, username, req.OldRank, req.OldRankName, req.NewRank, req.NewRankName, req.Time, req.RankType)
+	_, err := db.Exec(`insert into rankupdate (username,oldrank,oldrankname,newrank,newrankname,timeat,ranktype) values ($1,$2,$3,$4,$5,$6,$7)`, username, req.OldRank, req.OldRankName, req.NewRank, req.NewRankName, time.Unix(int64(req.Time), 0), req.RankType)
 	if err != nil {
 		return err
 	}
@@ -271,8 +308,25 @@ func main() {
 	e := echo.New()
 
 	// Initialize DB
+	dbUser := os.Getenv("DB_USER")
+	if dbUser == "" {
+		dbUser = "nextpex"
+	}
+	dbPass := os.Getenv("DB_PASS")
+	if dbPass == "" {
+		dbPass = "nextpex"
+	}
+	dbHost := os.Getenv("DB_HOST")
+	if dbHost == "" {
+		dbHost = "localhost"
+	}
+	dbName := os.Getenv("DB_NAME")
+	if dbName == "" {
+		dbName = "nextpex"
+	}
 	var err error
-	db, err = sqlx.Connect("sqlite3", "./db.sqlite3")
+	connStr := fmt.Sprintf("host=%s user=%s password=%s dbname=%s sslmode=disable", dbHost, dbUser, dbPass, dbName)
+	db, err = sqlx.Connect("postgres", connStr)
 	if err != nil {
 		panic(err)
 	}
@@ -291,7 +345,7 @@ func main() {
 	e.GET("/check/history", getLatestGameSessions)
 	e.GET("/check/monthly", getMonthlyPlayingTime)
 
-	e.POST("/check", insertCheck)
+	// e.POST("/check", insertCheck)
 	e.POST("/level", insertLevelUpdate)
 	e.POST("/rank", insertRankUpdate)
 
