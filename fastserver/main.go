@@ -1,14 +1,16 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
+	"os"
 	"strconv"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 
-	_ "github.com/mattn/go-sqlite3"
+	_ "github.com/lib/pq"
 )
 
 var (
@@ -277,8 +279,13 @@ func main() {
 	e := echo.New()
 
 	// Initialize DB
+	dbUser := os.Getenv("DB_USER")
+	dbPass := os.Getenv("DB_PASS")
+	dbHost := os.Getenv("DB_HOST")
+	dbName := os.Getenv("DB_NAME")
 	var err error
-	db, err = sqlx.Connect("sqlite3", "./db.sqlite3")
+	connStr := fmt.Sprintf("host=%s user=%s password=%s dbname=%s sslmode=disable", dbHost, dbUser, dbPass, dbName)
+	db, err = sqlx.Connect("postgres", connStr)
 	if err != nil {
 		panic(err)
 	}
