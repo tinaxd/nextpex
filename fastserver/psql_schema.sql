@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS levelupdate(
     username VARCHAR(64) NOT NULL REFERENCES "user"(username) ON DELETE CASCADE ON UPDATE CASCADE,
     oldlevel INTEGER,
     newlevel INTEGER NOT NULL,
-    timeat TIMESTAMP NOT NULL
+    timeat TIMESTAMP WITH TIME ZONE NOT NULL
 );
 CREATE TABLE IF NOT EXISTS rankupdate(
     id SERIAL PRIMARY KEY,
@@ -23,15 +23,15 @@ CREATE TABLE IF NOT EXISTS rankupdate(
     newrank INTEGER NOT NULL,
     newrankname VARCHAR(32) NOT NULL,
     ranktype VARCHAR(16) NOT NULL,
-    timeat TIMESTAMP NOT NULL
+    timeat TIMESTAMP WITH TIME ZONE NOT NULL
 );
 CREATE TABLE IF NOT EXISTS playingtime(
     id SERIAL PRIMARY KEY,
     username VARCHAR(64) NOT NULL REFERENCES "user"(username) ON DELETE CASCADE ON UPDATE CASCADE,
     gamename VARCHAR(128) REFERENCES game(gamename) ON DELETE
     SET NULL ON UPDATE CASCADE,
-        startedat TIMESTAMP NOT NULL,
-        endedat TIMESTAMP NULL
+        startedat TIMESTAMP WITH TIME ZONE NOT NULL,
+        endedat TIMESTAMP WITH TIME ZONE NULL
 );
 CREATE VIEW monthlycheck AS
 select username,
