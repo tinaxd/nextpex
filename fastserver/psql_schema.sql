@@ -5,7 +5,8 @@ CREATE TABLE IF NOT EXISTS ingamename(
 );
 CREATE TABLE IF NOT EXISTS game(
     gamename VARCHAR(128) PRIMARY KEY,
-    is_checked BOOLEAN NOT NULL DEFAULT TRUE
+    is_checked BOOLEAN NOT NULL DEFAULT TRUE,
+    emoji_name VARCHAR(32) NULL DEFAULT NULL
 );
 CREATE TABLE IF NOT EXISTS levelupdate(
     id SERIAL PRIMARY KEY,
@@ -52,8 +53,8 @@ group by username,
     year;
 create table if not exists minecraft_players (playername varchar(64) NOT NULL primary key);
 CREATE TABLE IF NOT EXISTS bot_guild (
-    guildid INTEGER NOT NULL PRIMARY KEY,
-    minecraft_channel INTEGER NULL
+    guild_id VARCHAR(64) NOT NULL PRIMARY KEY,
+    self_check_msg_id VARCHAR(64) NULL DEFAULT NULL
 );
 CREATE TABLE IF NOT EXISTS user_data (
     uid TEXT PRIMARY KEY,
