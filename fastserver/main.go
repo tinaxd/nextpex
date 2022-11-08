@@ -97,7 +97,7 @@ func getAllRanks(c echo.Context) error {
 
 func getNowPlaying(c echo.Context) error {
 	var nowPlaying []PlayingTimeWithoutEndedAt
-	err := db.Select(&nowPlaying, `select username,gamename,ROUND(EXTRACT(epoch FROM startedat)) AS startedat from playingtime where endedat IS NULL order by startedat desc`)
+	err := db.Select(&nowPlaying, `select username,gamename,cast(EXTRACT(epoch FROM startedat) as integer) AS startedat from playingtime where endedat IS NULL order by startedat desc`)
 	if err != nil {
 		return err
 	}
@@ -118,7 +118,7 @@ func getLatestGameSessions(c echo.Context) error {
 		}
 	}
 
-	err := db.Select(&sessions, "select username,gamename,ROUND(EXTRACT(epoch FROM startedat)) AS startedat,ROUND(EXTRACT(epoch FROM endedat)) AS endedat from playingtime where endedat IS NOT NULL order by endedat desc limit $1", limit)
+	err := db.Select(&sessions, "select username,gamename,cast(EXTRACT(epoch FROM startedat) as integer) AS startedat,cast(EXTRACT(epoch FROM endedat) AS INTEGER) AS endedat from playingtime where endedat IS NOT NULL order by endedat desc limit $1", limit)
 	if err != nil {
 		return err
 	}
