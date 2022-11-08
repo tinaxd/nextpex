@@ -101,8 +101,19 @@ func presenceUpdate(s *discordgo.Session, p *discordgo.PresenceUpdate) {
 	}
 	newGame := extractGameFromActivities(p.Presence.Activities)
 
-	log.Printf("prevGame: %s, newGame: %s", prevGame, newGame)
+	member, err := s.GuildMember(p.GuildID, p.User.ID)
+	if err != nil {
+		log.Printf("guild member err: %v", err)
+	}
+
+	username := member.Nick
+	if username == "" {
+		username = member.User.Username
+	}
+
+	log.Printf("prevGame: %v, newGame: %v, username: %v", prevGame, newGame, username)
 	if prevGame == "" && newGame != "" {
+		log.Printf("game start: %v %v", username, newGame)
 		// start
 		checked, err := isCheckedGame(newGame)
 		if err != nil {
@@ -110,6 +121,7 @@ func presenceUpdate(s *discordgo.Session, p *discordgo.PresenceUpdate) {
 			return
 		}
 		if !checked {
+			log.Printf("game %s is not checked", newGame)
 			return
 		}
 
@@ -122,11 +134,12 @@ func presenceUpdate(s *discordgo.Session, p *discordgo.PresenceUpdate) {
 			log.Printf("presence update err: %v", err)
 			return
 		}
-		if err := insertCheck(p.User.Username, newGame, true); err != nil {
+		if err := insertCheck(username, newGame, true); err != nil {
 			log.Printf("presence update err: %v", err)
 			return
 		}
 	} else if prevGame != "" && newGame == "" {
+		log.Printf("game stop: %v %v", username, newGame)
 		// stop
 		checked, err := isCheckedGame(prevGame)
 		if err != nil {
@@ -134,6 +147,7 @@ func presenceUpdate(s *discordgo.Session, p *discordgo.PresenceUpdate) {
 			return
 		}
 		if !checked {
+			log.Printf("game %s is not checked", newGame)
 			return
 		}
 
@@ -146,17 +160,19 @@ func presenceUpdate(s *discordgo.Session, p *discordgo.PresenceUpdate) {
 			log.Printf("presence update err: %v", err)
 			return
 		}
-		if err := insertCheck(p.User.Username, prevGame, false); err != nil {
+		if err := insertCheck(username, prevGame, false); err != nil {
 			log.Printf("presence update err: %v", err)
 			return
 		}
 	} else if prevGame != "" && newGame != "" && prevGame != newGame {
+		log.Printf("game replace: %v %v", username, newGame)
 		checked, err := isCheckedGame(newGame)
 		if err != nil {
 			log.Printf("presence update err: %v", err)
 			return
 		}
 		if !checked {
+			log.Printf("game %s is not checked", newGame)
 			return
 		}
 
@@ -165,6 +181,7 @@ func presenceUpdate(s *discordgo.Session, p *discordgo.PresenceUpdate) {
 			return
 		}
 	} else {
+		log.Printf("game ??: %v %v", username, newGame)
 		return
 	}
 }
