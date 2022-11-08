@@ -43,7 +43,10 @@ func getAllLevels(c echo.Context) error {
 		})
 	}
 
-	return c.JSON(http.StatusOK, levelMap)
+	response := make(map[string]interface{})
+	response["levels"] = levelMap
+
+	return c.JSON(http.StatusOK, response)
 }
 
 type RankResponse struct {
@@ -83,7 +86,10 @@ func getAllRanks(c echo.Context) error {
 		})
 	}
 
-	return c.JSON(http.StatusOK, rankMap)
+	response := make(map[string]interface{})
+	response["ranks"] = rankMap
+
+	return c.JSON(http.StatusOK, response)
 }
 
 func getNowPlaying(c echo.Context) error {
